@@ -12,6 +12,11 @@ static/outputs/
 # Runtime-generated reports
 reports/
 
+# Large files in YOLO directory not needed for deployment
+YOLOv8_Pothole_Segmentation_Road_Damage_Assessment/*.ipynb
+YOLOv8_Pothole_Segmentation_Road_Damage_Assessment/*.gif
+YOLOv8_Pothole_Segmentation_Road_Damage_Assessment/*.mp4
+
 # Python eggs
 *.egg-info/
 dist/
