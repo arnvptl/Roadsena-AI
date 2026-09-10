@@ -4,7 +4,7 @@ All routes, AI detection, scoring, PDF, WhatsApp, Email, Chat Agent,
 and Repair Verification System in one file.
 """
 
-import os, json, base64, uuid, time, re, smtplib, math
+import os, json, base64, uuid, time, re, smtplib, math, threading
 from datetime import datetime
 from io import BytesIO
 from email.mime.multipart import MIMEMultipart
@@ -597,7 +597,7 @@ Sent by RoadSense AI from onkarkorale7@gmail.com
                 msg.attach(part)
 
     try:
-        server = smtplib.SMTP(ALERT_CONFIG["smtp_server"], ALERT_CONFIG["smtp_port"])
+        server = smtplib.SMTP(ALERT_CONFIG["smtp_server"], ALERT_CONFIG["smtp_port"], timeout=10)
         server.ehlo()
         server.starttls()
         server.login(sender, password)
@@ -1021,7 +1021,7 @@ def api_stop_session():
     if not record:
         return jsonify({"error": "Could not finalise session"}), 500
 
-    send_all_alerts(record, officer_username=officer_username)
+    threading.Thread(target=send_all_alerts, args=(record,), kwargs={"officer_username": officer_username}, daemon=True).start()
 
     return jsonify({
         "road_name":       record["road_name"],
@@ -1088,7 +1088,7 @@ def api_upload_image():
     score, scored_dets = calc_score(raw_dets, w, h)
     annotated          = annotate_image(image_bytes, scored_dets)
     record             = save_record(road_name, lat, lng, scored_dets, score, annotated, "citizen")
-    send_all_alerts(record, officer_username=None)
+    threading.Thread(target=send_all_alerts, args=(record,), kwargs={"officer_username": None}, daemon=True).start()
 
     return jsonify({
         "detected":      len(scored_dets) > 0,
@@ -1195,7 +1195,7 @@ def api_process_video():
                                          score, annotated, "video")
                     if worst_record is None or score > worst_record["score"]:
                         worst_record = record
-                    send_all_alerts(record, officer_username=officer_username)
+                    threading.Thread(target=send_all_alerts, args=(record,), kwargs={"officer_username": officer_username}, daemon=True).start()
 
                 else:
                     # No defects — stamp frame and save it too

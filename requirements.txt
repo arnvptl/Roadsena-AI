@@ -10,3 +10,4 @@ anthropic
 werkzeug
 tqdm
 pyyaml
+dill
