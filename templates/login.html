@@ -56,7 +56,17 @@
       pointer-events:none; overflow:hidden; z-index:-1;
       opacity:.06;
     }
-  </style>
+  
+    @media (max-width: 480px) {
+      .login-card { padding: 28px 22px; margin: 12px; }
+    }
+    @supports (padding: max(0px)) {
+      body { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+    }
+    /* Improve touch targets */
+    .btn-login { min-height: 50px; }
+    .form-control { min-height: 46px; }
+</style>
 </head>
 <body>
   <!-- Decorative background lines -->

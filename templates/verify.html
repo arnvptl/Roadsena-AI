@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Repair Verification — RoadSense AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:     #050b14;
+  --surf1:  #0b1524;
+  --surf2:  #0f1e30;
+  --surf3:  #162436;
+  --border: #1a2f45;
+  --text:   #e8f0fe;
+  --muted:  #4a6d8c;
+  --accent: #3b82f6;
+  --green:  #10b981;
+  --amber:  #f59e0b;
+  --red:    #ef4444;
+  --dark-red:#7b0000;
+}
+
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── GRID BACKGROUND ── */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(59,130,246,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,.03) 1px, transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;z-index:0;
+}
+
+.page{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:0 24px 100px}
+
+/* ── HERO ── */
+.hero{
+  padding:56px 0 40px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:48px;
+  display:flex;align-items:flex-start;gap:24px;
+}
+.hero-icon{
+  width:72px;height:72px;border-radius:18px;flex-shrink:0;
+  background:linear-gradient(135deg,#10b981,#3b82f6);
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;
+  box-shadow:0 0 40px rgba(16,185,129,.3);
+}
+.hero-tag{
+  font-family:'DM Mono',monospace;font-size:11px;letter-spacing:3px;
+  text-transform:uppercase;color:var(--green);margin-bottom:10px;
+}
+.hero h1{
+  font-family:'Syne',sans-serif;font-size:clamp(28px,4vw,42px);
+  font-weight:800;line-height:1.1;margin-bottom:10px;
+}
+.hero h1 em{color:var(--green);font-style:normal;}
+.hero p{font-size:15px;color:var(--muted);max-width:500px;line-height:1.7}
+
+/* ── SECTION LABEL ── */
+.sec-label{
+  font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;
+  text-transform:uppercase;color:var(--muted);margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;
+}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── CARD ── */
+.card{
+  background:var(--surf1);
+  border:1px solid var(--border);
+  border-radius:16px;padding:28px;margin-bottom:20px;
+}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{
+  border:2px dashed var(--border);border-radius:12px;
+  padding:40px 24px;text-align:center;cursor:pointer;
+  transition:all .2s;position:relative;overflow:hidden;
+  background:var(--surf2);
+}
+.upload-zone:hover,.upload-zone.drag{
+  border-color:var(--accent);
+  background:rgba(59,130,246,.05);
+}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{font-size:40px;margin-bottom:12px;}
+.upload-zone h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:6px;}
+.upload-zone p{font-size:13px;color:var(--muted);}
+.preview-img{
+  width:100%;max-height:260px;object-fit:cover;
+  border-radius:10px;margin-top:16px;display:none;
+  border:2px solid var(--green);
+}
+
+/* ── GPS STATUS ── */
+.gps-bar{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 18px;border-radius:10px;
+  background:var(--surf2);border:1px solid var(--border);margin-top:14px;
+}
+.gps-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.gps-dot.searching{background:var(--amber);animation:blink 1s infinite;}
+.gps-dot.found{background:var(--green);}
+.gps-dot.denied{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.gps-info{flex:1;}
+.gps-info strong{font-size:13px;display:block;margin-bottom:2px;}
+.gps-info span{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+
+/* ── INPUT FIELDS ── */
+.field{margin-bottom:18px;}
+.field label{
+  display:block;font-family:'DM Mono',monospace;
+  font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;
+}
+.field input{
+  width:100%;padding:12px 16px;border-radius:10px;
+  border:1px solid var(--border);background:var(--surf2);
+  color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;
+  outline:none;transition:border-color .15s;
+}
+.field input:focus{border-color:var(--accent);}
+.field input::placeholder{color:var(--muted);}
+
+/* ── SUBMIT BTN ── */
+.submit-btn{
+  width:100%;padding:16px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,#10b981,#3b82f6);
+  color:white;font-family:'Syne',sans-serif;font-size:17px;
+  font-weight:800;letter-spacing:.5px;cursor:pointer;
+  transition:transform .15s,box-shadow .15s;
+  box-shadow:0 8px 32px rgba(16,185,129,.25);
+}
+.submit-btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(16,185,129,.35);}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+
+/* ── LOADER ── */
+.loader{display:none;text-align:center;padding:48px;}
+.loader-ring{
+  width:60px;height:60px;border-radius:50%;
+  border:3px solid var(--border);
+  border-top-color:var(--green);
+  animation:spin .8s linear infinite;
+  margin:0 auto 20px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader p{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);}
+.loader .steps{margin-top:16px;display:flex;flex-direction:column;gap:8px;align-items:center;}
+.loader .step{
+  font-size:12px;color:var(--muted);
+  font-family:'DM Mono',monospace;opacity:0;
+  transition:opacity .3s;
+}
+.loader .step.active{opacity:1;color:var(--green);}
+
+/* ══════════════════════════════════════════
+   RESULT SECTION
+══════════════════════════════════════════ */
+#result-section{display:none;}
+
+/* Verdict banner */
+.verdict-banner{
+  border-radius:16px;padding:32px;text-align:center;
+  margin-bottom:20px;border:2px solid;
+  position:relative;overflow:hidden;
+}
+.verdict-banner::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at center,rgba(255,255,255,.03),transparent 70%);
+}
+.verdict-icon{font-size:56px;margin-bottom:12px;display:block;}
+.verdict-title{
+  font-family:'Syne',sans-serif;font-size:26px;font-weight:800;
+  margin-bottom:8px;
+}
+.verdict-sub{font-size:14px;opacity:.7;font-family:'DM Mono',monospace;}
+
+/* Confidence meter */
+.confidence-wrap{margin-top:20px;}
+.confidence-label{
+  display:flex;justify-content:space-between;
+  font-family:'DM Mono',monospace;font-size:11px;
+  color:var(--muted);margin-bottom:8px;
+}
+.confidence-bar-bg{
+  height:8px;border-radius:100px;
+  background:rgba(255,255,255,.08);overflow:hidden;
+}
+.confidence-bar{
+  height:100%;border-radius:100px;
+  background:linear-gradient(90deg,#10b981,#3b82f6);
+  transition:width 1.2s cubic-bezier(.4,0,.2,1);width:0%;
+}
+
+/* ── SCORE COMPARE ── */
+.score-compare{
+  display:grid;grid-template-columns:1fr auto 1fr;
+  gap:0;align-items:center;margin-bottom:20px;
+}
+.score-side{
+  background:var(--surf2);border:1px solid var(--border);
+  border-radius:14px;padding:20px;text-align:center;
+}
+.score-side-label{
+  font-family:'DM Mono',monospace;font-size:10px;
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;
+}
+.score-big{
+  font-family:'Syne',sans-serif;font-size:52px;
+  font-weight:800;line-height:1;margin-bottom:8px;
+}
+.score-badge{
+  display:inline-block;padding:4px 14px;border-radius:100px;
+  font-size:12px;font-weight:700;color:white;
+}
+.score-arrow{
+  font-size:32px;text-align:center;padding:0 16px;
+  color:var(--green);
+}
+.drop-pill{
+  background:rgba(16,185,129,.12);border:1px solid var(--green);
+  border-radius:8px;padding:12px;text-align:center;margin-top:10px;
+}
+.drop-pill .drop-num{
+  font-family:'Syne',sans-serif;font-size:28px;font-weight:800;
+  color:var(--green);
+}
+.drop-pill .drop-label{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;}
+
+/* ── BEFORE / AFTER PHOTOS ── */
+.photo-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+.photo-frame{border-radius:12px;overflow:hidden;border:2px solid var(--border);}
+.photo-frame-label{
+  padding:10px 14px;font-family:'DM Mono',monospace;
+  font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;
+}
+.photo-frame img{width:100%;height:180px;object-fit:cover;display:block;}
+.photo-placeholder{
+  height:180px;display:flex;align-items:center;justify-content:center;
+  font-size:32px;background:var(--surf2);
+}
+
+/* ── GPS RESULT ── */
+.gps-result-card{
+  display:flex;align-items:center;gap:16px;
+  padding:18px 20px;border-radius:12px;
+  border:1px solid var(--border);background:var(--surf2);margin-bottom:20px;
+}
+.gps-result-icon{font-size:32px;flex-shrink:0;}
+.gps-result-info{}
+.gps-result-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;}
+.gps-result-detail{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);}
+.gps-distance-pill{
+  margin-left:auto;flex-shrink:0;
+  font-family:'DM Mono',monospace;font-size:13px;font-weight:500;
+  padding:6px 14px;border-radius:100px;border:1px solid;
+}
+
+/* ── EVIDENCE CHAIN ── */
+.evidence-title{
+  font-family:'Syne',sans-serif;font-size:18px;font-weight:700;
+  margin-bottom:18px;
+}
+.evidence-list{display:flex;flex-direction:column;gap:10px;}
+.evidence-item{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 18px;border-radius:10px;
+  background:var(--surf2);border:1px solid var(--border);
+  transition:border-color .2s;
+}
+.evidence-item.pass{border-color:rgba(16,185,129,.3);}
+.evidence-item.fail{border-color:rgba(239,68,68,.3);}
+.ev-check{
+  width:32px;height:32px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:700;
+}
+.ev-check.pass{background:rgba(16,185,129,.15);color:var(--green);}
+.ev-check.fail{background:rgba(239,68,68,.15);color:var(--red);}
+.ev-body{flex:1;}
+.ev-point{font-size:13px;font-weight:600;margin-bottom:3px;}
+.ev-detail{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;}
+.ev-result{
+  font-size:12px;font-family:'DM Mono',monospace;
+  margin-left:auto;flex-shrink:0;max-width:200px;text-align:right;
+}
+
+/* ── REMAINING DEFECTS ── */
+.defect-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 12px;border-radius:8px;
+  background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
+  font-size:12px;font-family:'DM Mono',monospace;color:#fca5a5;
+  margin:4px;
+}
+
+/* ── ACTION BUTTONS ── */
+.action-row{display:flex;gap:12px;margin-top:24px;}
+.action-btn{
+  flex:1;padding:14px;border-radius:10px;border:none;cursor:pointer;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
+  transition:all .15s;
+}
+.action-btn.primary{
+  background:linear-gradient(135deg,#10b981,#3b82f6);color:white;
+  box-shadow:0 4px 20px rgba(16,185,129,.2);
+}
+.action-btn.secondary{
+  background:var(--surf2);color:var(--text);
+  border:1px solid var(--border);
+}
+.action-btn:hover{transform:translateY(-1px);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .score-compare{grid-template-columns:1fr;gap:10px;}
+  .score-arrow{transform:rotate(90deg);}
+  .photo-compare{grid-template-columns:1fr;}
+  .hero{flex-direction:column;gap:16px;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-icon">✅</div>
+    <div>
+      <div class="hero-tag">RoadSense AI — Verification System</div>
+      <h1>Repair<br/><em>Verification</em></h1>
+      <p>Upload an after-repair photo. Our AI verifies the repair using GPS location matching + damage score comparison — giving judges a tamper-proof 5-point evidence chain.</p>
+    </div>
+  </div>
+
+  <!-- UPLOAD FORM -->
+  <div id="upload-section">
+
+    <div class="sec-label">Step 1 — Upload After-Repair Photo</div>
+    <div class="card">
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="photo-input" accept="image/*" onchange="previewPhoto(this)"/>
+        <div class="upload-icon">📸</div>
+        <h3>Drop your photo here or click to browse</h3>
+        <p>Take a clear photo of the repaired road section</p>
+        <img id="preview" class="preview-img"/>
+      </div>
+    </div>
+
+    <div class="sec-label">Step 2 — GPS Location</div>
+    <div class="card">
+      <div class="gps-bar" id="gps-bar">
+        <div class="gps-dot searching" id="gps-dot"></div>
+        <div class="gps-info">
+          <strong id="gps-status-text">Acquiring GPS location...</strong>
+          <span id="gps-coords">Please allow location access</span>
+        </div>
+        <button onclick="getGPS()" style="background:var(--surf3);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-family:'DM Mono',monospace;">
+          🔄 Refresh
+        </button>
+      </div>
+      <input type="hidden" id="lat-input" value="0"/>
+      <input type="hidden" id="lng-input" value="0"/>
+
+      <div style="margin-top:16px">
+        <div class="field">
+          <label>Record ID from Alert Email (optional — helps find exact road)</label>
+          <input type="text" id="record-id-input" placeholder="e.g. A1B2C3D4 (from email footer)"/>
+        </div>
+        <div class="field">
+          <label>Your Name / Officer Name</label>
+          <input type="text" id="verifier-input" placeholder="e.g. Arnav P — Field Officer"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-label">Step 3 — Verify</div>
+    <button class="submit-btn" id="verify-btn" onclick="submitVerification()">
+      🔍 Verify Repair with AI
+    </button>
+
+  </div>
+
+  <!-- LOADER -->
+  <div class="loader" id="loader">
+    <div class="loader-ring"></div>
+    <p>Running AI verification...</p>
+    <div class="steps">
+      <div class="step" id="ls1">📡 Reading GPS coordinates...</div>
+      <div class="step" id="ls2">🗄️ Searching damage database...</div>
+      <div class="step" id="ls3">📏 Calculating GPS distance...</div>
+      <div class="step" id="ls4">🤖 Running YOLO on after-photo...</div>
+      <div class="step" id="ls5">📊 Comparing before vs after scores...</div>
+      <div class="step" id="ls6">🔒 Generating evidence chain...</div>
+    </div>
+  </div>
+
+  <!-- RESULT SECTION -->
+  <div id="result-section">
+
+    <!-- 1. OVERALL VERDICT BANNER -->
+    <div class="sec-label">AI Verification Result</div>
+    <div class="verdict-banner" id="verdict-banner">
+      <span class="verdict-icon" id="verdict-icon"></span>
+      <div class="verdict-title" id="verdict-title"></div>
+      <div class="verdict-sub" id="verdict-sub"></div>
+      <div class="confidence-wrap">
+        <div class="confidence-label">
+          <span>AI Confidence Score</span>
+          <span id="conf-pct"></span>
+        </div>
+        <div class="confidence-bar-bg">
+          <div class="confidence-bar" id="conf-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. SCORE COMPARISON -->
+    <div class="sec-label">Severity Score Comparison</div>
+    <div class="card" style="padding:20px">
+      <div class="score-compare">
+        <div class="score-side">
+          <div class="score-side-label" style="color:#ef4444">🔴 Before Repair</div>
+          <div class="score-big" id="before-score" style="color:#ef4444"></div>
+          <div><span class="score-badge" id="before-badge"></span></div>
+        </div>
+        <div style="text-align:center;padding:0 12px">
+          <div class="score-arrow">→</div>
+          <div class="drop-pill">
+            <div class="drop-num" id="drop-num"></div>
+            <div class="drop-label">improvement</div>
+          </div>
+        </div>
+        <div class="score-side">
+          <div class="score-side-label" style="color:#10b981">✅ After Repair</div>
+          <div class="score-big" id="after-score" style="color:#10b981"></div>
+          <div><span class="score-badge" id="after-badge"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. BEFORE / AFTER PHOTOS -->
+    <div class="sec-label">Before & After Photos</div>
+    <div class="photo-compare">
+      <div class="photo-frame">
+        <div class="photo-frame-label" style="background:rgba(239,68,68,.2);color:#fca5a5">
+          📸 Before — Damaged Road
+        </div>
+        <div id="before-photo-wrap">
+          <div class="photo-placeholder">🔴</div>
+        </div>
+      </div>
+      <div class="photo-frame">
+        <div class="photo-frame-label" style="background:rgba(16,185,129,.15);color:#6ee7b7">
+          📸 After — Repaired Road
+        </div>
+        <div id="after-photo-wrap">
+          <div class="photo-placeholder">✅</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. GPS MATCH RESULT -->
+    <div class="sec-label">GPS Location Verification</div>
+    <div class="gps-result-card" id="gps-result-card">
+      <div class="gps-result-icon" id="gps-result-icon">📍</div>
+      <div class="gps-result-info">
+        <div class="gps-result-title" id="gps-result-title"></div>
+        <div class="gps-result-detail" id="gps-result-detail"></div>
+      </div>
+      <div class="gps-distance-pill" id="gps-pill"></div>
+    </div>
+
+    <!-- 5. EVIDENCE CHAIN -->
+    <div class="sec-label">5-Point Evidence Chain</div>
+    <div class="card">
+      <div class="evidence-title">AI Verification Checklist</div>
+      <div class="evidence-list" id="evidence-list"></div>
+    </div>
+
+    <!-- 6. REMAINING DEFECTS (if any) -->
+    <div id="remaining-section" style="display:none">
+      <div class="sec-label">Remaining Defects Detected</div>
+      <div class="card">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+          AI still detected the following issues in the after-photo:
+        </p>
+        <div id="remaining-chips"></div>
+      </div>
+    </div>
+
+    <!-- 7. ACTIONS -->
+    <div class="action-row">
+      <button class="action-btn primary" onclick="window.print()">
+        🖨️ Print Certificate
+      </button>
+      <button class="action-btn secondary" onclick="resetForm()">
+        🔄 Verify Another Road
+      </button>
+      <button class="action-btn secondary" onclick="window.location.href='/city-map'">
+        🗺️ View Dashboard
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ─── State ─────────────────────────────────────────────────────────── */
+var userLat = 0, userLng = 0, gpsReady = false;
+
+/* ─── GPS ─────────────────────────────────────────────────────────────── */
+function getGPS(){
+  var dot  = document.getElementById('gps-dot');
+  var txt  = document.getElementById('gps-status-text');
+  var cord = document.getElementById('gps-coords');
+  dot.className = 'gps-dot searching';
+  txt.textContent = 'Acquiring GPS...';
+
+  if(!navigator.geolocation){
+    dot.className = 'gps-dot denied';
+    txt.textContent = 'GPS not supported — enter coordinates manually';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    function(pos){
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      gpsReady = true;
+      dot.className   = 'gps-dot found';
+      txt.textContent = '✅ GPS Location Acquired';
+      cord.textContent = userLat.toFixed(6) + ', ' + userLng.toFixed(6)
+        + '  (±' + Math.round(pos.coords.accuracy) + 'm accuracy)';
+      document.getElementById('lat-input').value = userLat;
+      document.getElementById('lng-input').value = userLng;
+    },
+    function(err){
+      dot.className   = 'gps-dot denied';
+      txt.textContent = 'GPS denied — using default coordinates';
+      cord.textContent = 'Using: 17.6868, 75.9079 (Solapur default)';
+      userLat = 17.6868; userLng = 75.9079;
+      document.getElementById('lat-input').value = userLat;
+      document.getElementById('lng-input').value = userLng;
+    },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+}
+getGPS();  /* auto-start on page load */
+
+/* ─── Photo preview ─────────────────────────────────────────────────── */
+function previewPhoto(input){
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = document.getElementById('preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    // try to extract GPS from EXIF (browsers don't expose this natively — just show preview)
+  };
+  reader.readAsDataURL(file);
+}
+
+/* Drag & drop */
+var dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover',  function(e){ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', function(){ dz.classList.remove('drag'); });
+dz.addEventListener('drop', function(e){
+  e.preventDefault(); dz.classList.remove('drag');
+  var dt = e.dataTransfer;
+  if(dt.files.length){
+    document.getElementById('photo-input').files = dt.files;
+    previewPhoto(document.getElementById('photo-input'));
+  }
+});
+
+/* ─── Submit ─────────────────────────────────────────────────────────── */
+async function submitVerification(){
+  var file     = document.getElementById('photo-input').files[0];
+  var verifier = document.getElementById('verifier-input').value.trim() || 'Anonymous';
+  var recId    = document.getElementById('record-id-input').value.trim();
+
+  if(!file){ alert('Please upload a photo first.'); return; }
+
+  /* Show loader */
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('result-section').style.display = 'none';
+  var loader = document.getElementById('loader');
+  loader.style.display = 'block';
+
+  /* Animate loader steps */
+  var steps = ['ls1','ls2','ls3','ls4','ls5','ls6'];
+  steps.forEach(function(id,i){
+    setTimeout(function(){ document.getElementById(id).classList.add('active'); }, i*600);
+  });
+
+  var form = new FormData();
+  form.append('image',         file);
+  form.append('lat',           userLat);
+  form.append('lng',           userLng);
+  form.append('verifier_name', verifier);
+  if(recId) form.append('record_id', recId);
+
+  try{
+    var res  = await fetch('/api/verify-repair', {method:'POST', body:form});
+    var data = await res.json();
+    setTimeout(function(){ showResult(data); }, 3800);
+  } catch(e){
+    loader.style.display = 'none';
+    document.getElementById('upload-section').style.display = 'block';
+    alert('Server error — make sure Flask is running.');
+  }
+}
+
+/* ─── Show result ────────────────────────────────────────────────────── */
+function showResult(d){
+  document.getElementById('loader').style.display = 'none';
+  var rs = document.getElementById('result-section');
+  rs.style.display = 'block';
+  rs.scrollIntoView({behavior:'smooth'});
+
+  /* ── 1. VERDICT BANNER ── */
+  var verdictMap = {
+    'VERIFIED_FIXED':   {icon:'✅', bg:'rgba(16,185,129,.08)',  border:'#10b981'},
+    'PARTIAL_REPAIR':   {icon:'🟡', bg:'rgba(245,158,11,.08)',  border:'#f59e0b'},
+    'NOT_REPAIRED':     {icon:'🔴', bg:'rgba(239,68,68,.08)',   border:'#ef4444'},
+    'LOCATION_MISMATCH':{icon:'📍', bg:'rgba(239,68,68,.08)',   border:'#ef4444'},
+  };
+  var vm = verdictMap[d.overall_verdict] || verdictMap['NOT_REPAIRED'];
+  var banner = document.getElementById('verdict-banner');
+  banner.style.background   = vm.bg;
+  banner.style.borderColor  = vm.border;
+  document.getElementById('verdict-icon').textContent  = vm.icon;
+  document.getElementById('verdict-title').textContent = d.overall_label;
+  document.getElementById('verdict-sub').textContent   =
+    d.road_name + '  ·  Verified: ' + d.verified_at + '  ·  By: ' + d.verifier;
+  document.getElementById('conf-pct').textContent = d.confidence + '% confidence';
+  setTimeout(function(){
+    document.getElementById('conf-bar').style.width = d.confidence + '%';
+  }, 400);
+
+  /* ── 2. SCORES ── */
+  document.getElementById('before-score').textContent = d.before_score + '/10';
+  document.getElementById('after-score').textContent  = d.after_score  + '/10';
+  document.getElementById('drop-num').textContent     = d.score_drop_pct + '%';
+  var bb = document.getElementById('before-badge');
+  bb.textContent   = d.before_level;
+  bb.style.background = d.before_color;
+  var ab = document.getElementById('after-badge');
+  ab.textContent   = d.after_level;
+  ab.style.background = d.after_color;
+
+  /* ── 3. PHOTOS ── */
+  if(d.before_img){
+    document.getElementById('before-photo-wrap').innerHTML =
+      '<img src="'+d.before_img+'" style="width:100%;height:180px;object-fit:cover;display:block;"/>';
+  }
+  if(d.after_img){
+    document.getElementById('after-photo-wrap').innerHTML =
+      '<img src="'+d.after_img+'" style="width:100%;height:180px;object-fit:cover;display:block;"/>';
+  }
+
+  /* ── 4. GPS CARD ── */
+  var gpsIconMap = {exact:'✅',near:'📍',far:'⚠️',wrong:'❌'};
+  document.getElementById('gps-result-icon').textContent  = gpsIconMap[d.gps_verdict]||'📍';
+  document.getElementById('gps-result-title').textContent = d.gps_label;
+  document.getElementById('gps-result-title').style.color = d.gps_color;
+  document.getElementById('gps-result-detail').textContent =
+    'Upload GPS: ' + userLat.toFixed(4) + ', ' + userLng.toFixed(4) +
+    '  →  Original: ' + (d.original_lat||0).toFixed(4) + ', ' + (d.original_lng||0).toFixed(4);
+  var pill = document.getElementById('gps-pill');
+  pill.textContent     = d.gps_distance_m + 'm away';
+  pill.style.color     = d.gps_color;
+  pill.style.borderColor = d.gps_color;
+
+  /* ── 5. EVIDENCE CHAIN ── */
+  var evList = document.getElementById('evidence-list');
+  evList.innerHTML = '';
+  (d.evidence||[]).forEach(function(ev, idx){
+    var item = document.createElement('div');
+    item.className = 'evidence-item ' + (ev.passed ? 'pass' : 'fail');
+    item.style.animationDelay = (idx*0.1)+'s';
+    item.innerHTML =
+      '<div class="ev-check '+(ev.passed?'pass':'fail')+'">'+(ev.passed?'✓':'✗')+'</div>'+
+      '<div class="ev-body">'+
+        '<div class="ev-point">'+ev.point+'</div>'+
+        '<div class="ev-detail">'+ev.detail+'</div>'+
+      '</div>'+
+      '<div class="ev-result" style="color:'+(ev.passed?'var(--green)':'var(--red)')+'">'+
+        ev.result+
+      '</div>';
+    evList.appendChild(item);
+  });
+
+  /* ── 6. REMAINING DEFECTS ── */
+  if(d.remaining_defects && d.remaining_defects.length > 0){
+    document.getElementById('remaining-section').style.display = 'block';
+    var chips = document.getElementById('remaining-chips');
+    chips.innerHTML = '';
+    d.remaining_defects.forEach(function(def){
+      var chip = document.createElement('span');
+      chip.className = 'defect-chip';
+      chip.textContent = '⚠️ ' + def.label + ' — ' + def.score + '/10';
+      chips.appendChild(chip);
+    });
+  }
+}
+
+/* ─── Reset ──────────────────────────────────────────────────────────── */
+function resetForm(){
+  document.getElementById('upload-section').style.display = 'block';
+  document.getElementById('result-section').style.display = 'none';
+  document.getElementById('loader').style.display         = 'none';
+  document.getElementById('photo-input').value = '';
+  document.getElementById('preview').style.display = 'none';
+  document.getElementById('record-id-input').value = '';
+  document.getElementById('verifier-input').value  = '';
+  document.querySelectorAll('.step').forEach(function(s){ s.classList.remove('active'); });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

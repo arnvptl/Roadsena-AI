@@ -1,0 +1,804 @@
+<html><head><style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --cw-dark:    #0a0f1e;
+  --cw-surface: #111827;
+  --cw-surf2:   #1a2438;
+  --cw-surf3:   #0d1526;
+  --cw-border:  #1e3048;
+  --cw-text:    #e2eafc;
+  --cw-muted:   #4a6080;
+  --cw-accent:  #3b82f6;
+  --cw-green:   #10b981;
+  --cw-red:     #ef4444;
+}
+
+/* ── FAB ─────────────────────────────── */
+#cw-fab {
+  position: fixed; bottom: 28px; right: 28px;
+  width: 58px; height: 58px; border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border: none; cursor: pointer;
+  box-shadow: 0 8px 28px rgba(59,130,246,.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9990; transition: transform .2s, box-shadow .2s;
+}
+#cw-fab:hover { transform: scale(1.1); box-shadow: 0 12px 36px rgba(59,130,246,.65); }
+#cw-fab svg { width: 24px; height: 24px; fill: white; }
+#cw-fab::after {
+  content: ''; position: absolute; top: 9px; right: 9px;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--cw-green); border: 2px solid #0a0f1e;
+  animation: cw-pulse 2s ease infinite;
+}
+@keyframes cw-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.5); opacity: .5; }
+}
+
+/* ── WINDOW ─────────────────────────── */
+#cw-win {
+  position: fixed; bottom: 100px; right: 28px;
+  width: 400px; max-height: 600px;
+  background: var(--cw-dark);
+  border: 1px solid var(--cw-border); border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.04);
+  display: flex; flex-direction: column;
+  z-index: 9991; overflow: hidden;
+  opacity: 0; pointer-events: none;
+  transform: translateY(20px) scale(.94);
+  transition: opacity .24s, transform .3s cubic-bezier(.34,1.56,.64,1);
+}
+#cw-win.cw-open { opacity: 1; pointer-events: all; transform: translateY(0) scale(1); }
+
+/* ── HEADER ─────────────────────────── */
+.cw-hdr {
+  background: linear-gradient(135deg, #0d1a2e, #111827);
+  padding: 14px 16px; display: flex; align-items: center; gap: 11px;
+  border-bottom: 1px solid var(--cw-border); flex-shrink: 0;
+}
+.cw-av {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #10b981);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.25);
+}
+.cw-hdr-meta { flex: 1; }
+.cw-hdr-name {
+  font-family: 'DM Sans', sans-serif; font-weight: 700;
+  font-size: 14px; color: var(--cw-text); margin-bottom: 2px;
+}
+.cw-status {
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'DM Mono', monospace; font-size: 10px; color: var(--cw-green);
+}
+.cw-status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cw-green); animation: cw-pulse 2s infinite;
+}
+.cw-ibtn {
+  width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid var(--cw-border); background: transparent;
+  color: var(--cw-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .14s; margin-left: 3px; flex-shrink: 0;
+}
+.cw-ibtn:hover { background: var(--cw-surf2); color: var(--cw-text); }
+.cw-ibtn.cw-on { border-color: var(--cw-green); color: var(--cw-green); background: rgba(16,185,129,.12); }
+.cw-ibtn svg { width: 13px; height: 13px; }
+@keyframes cw-rec-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.3); }
+  50%       { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
+}
+/* Listening pill */
+#cw-voice-pill {
+  display: none; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 20px;
+  background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.35);
+  font-family: 'DM Mono', monospace; font-size: 10px; color: var(--cw-red);
+  flex-shrink: 0;
+}
+#cw-voice-pill.show { display: flex; }
+.cw-voice-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cw-red); animation: cw-pulse .8s infinite;
+}
+
+/* ── CHIPS ─────────────────────────── */
+.cw-chips {
+  padding: 9px 11px; display: flex; gap: 5px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--cw-border);
+  flex-shrink: 0; background: var(--cw-surf3);
+}
+.cw-chip {
+  font-size: 11px; font-family: 'DM Mono', monospace;
+  padding: 4px 10px; border-radius: 100px;
+  border: 1px solid var(--cw-border); background: var(--cw-surf2);
+  color: var(--cw-muted); cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.cw-chip:hover { border-color: var(--cw-accent); color: #93c5fd; background: rgba(59,130,246,.1); }
+
+/* ── MESSAGES ─────────────────────── */
+.cw-msgs {
+  flex: 1; overflow-y: auto; padding: 14px 12px;
+  display: flex; flex-direction: column; gap: 10px; min-height: 200px;
+}
+.cw-msgs::-webkit-scrollbar { width: 3px; }
+.cw-msgs::-webkit-scrollbar-thumb { background: var(--cw-border); border-radius: 2px; }
+
+.cw-row { display: flex; align-items: flex-end; gap: 8px; animation: cw-in .2s ease; }
+.cw-row.usr { flex-direction: row-reverse; }
+@keyframes cw-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+
+.cw-rav {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; flex-shrink: 0; font-weight: 700;
+}
+.cw-row:not(.usr) .cw-rav { background: linear-gradient(135deg,#3b82f6,#10b981); }
+.cw-row.usr       .cw-rav { background: #1e3a5f; color: #93c5fd; }
+
+.cw-bub {
+  max-width: 82%; padding: 10px 13px; border-radius: 15px;
+  font-size: 13px; font-family: 'DM Sans', sans-serif; line-height: 1.65;
+}
+.cw-row:not(.usr) .cw-bub {
+  background: var(--cw-surface); border: 1px solid var(--cw-border);
+  border-bottom-left-radius: 4px; color: var(--cw-text);
+}
+.cw-row.usr .cw-bub {
+  background: #1e3a5f; border: 1px solid rgba(59,130,246,.25);
+  border-bottom-right-radius: 4px; color: #c7d8f8;
+}
+
+/* ── SPEAKER BUTTON ───────────────── */
+.cw-spk {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 8px; padding: 4px 11px 4px 8px;
+  border-radius: 100px; border: 1px solid var(--cw-border);
+  background: rgba(255,255,255,.025); color: var(--cw-muted);
+  font-size: 11px; font-family: 'DM Mono', monospace;
+  cursor: pointer; transition: all .15s; user-select: none;
+}
+.cw-spk:hover { border-color: var(--cw-accent); color: #93c5fd; background: rgba(59,130,246,.08); }
+.cw-spk.talking {
+  border-color: var(--cw-green); color: var(--cw-green);
+  background: rgba(16,185,129,.1); box-shadow: 0 0 12px rgba(16,185,129,.2);
+}
+/* Static icon = visible when NOT talking */
+.cw-spk .si { width: 12px; height: 12px; fill: currentColor; flex-shrink: 0; }
+/* Animated bars = visible ONLY when .talking */
+.cw-spk .sb { display: none; gap: 2px; align-items: flex-end; height: 13px; flex-shrink: 0; }
+.cw-spk.talking .si { display: none; }
+.cw-spk.talking .sb { display: flex; }
+.cw-bar {
+  width: 3px; border-radius: 2px; background: var(--cw-green);
+  animation: cw-bar .55s ease infinite alternate; transform-origin: bottom;
+}
+.cw-bar:nth-child(1) { height: 5px;  animation-delay: 0s; }
+.cw-bar:nth-child(2) { height: 11px; animation-delay: .1s; }
+.cw-bar:nth-child(3) { height: 7px;  animation-delay: .2s; }
+.cw-bar:nth-child(4) { height: 9px;  animation-delay: .12s; }
+.cw-bar:nth-child(5) { height: 6px;  animation-delay: .08s; }
+@keyframes cw-bar { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
+
+/* ── TYPING DOTS ───────────────────── */
+.cw-typing .cw-bub { display: flex; gap: 5px; align-items: center; padding: 12px 14px; }
+.cw-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--cw-muted);
+  animation: cw-bounce 1.1s ease infinite;
+}
+.cw-dot:nth-child(2) { animation-delay: .18s; }
+.cw-dot:nth-child(3) { animation-delay: .36s; }
+@keyframes cw-bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-7px)} }
+
+/* ── FOOTER ────────────────────────── */
+.cw-foot {
+  border-top: 1px solid var(--cw-border);
+  padding: 10px 12px 13px; flex-shrink: 0; background: var(--cw-surf3);
+}
+.cw-irow { display: flex; gap: 7px; align-items: flex-end; }
+
+#cw-mic {
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: 9px;
+  border: 1px solid var(--cw-border); background: var(--cw-surf2);
+  color: var(--cw-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+#cw-mic:hover { border-color: var(--cw-accent); color: var(--cw-accent); background: rgba(59,130,246,.1); }
+#cw-mic.rec { background: rgba(239,68,68,.12); border-color: var(--cw-red); color: var(--cw-red); animation: cw-rec-glow 1s infinite; }
+#cw-mic.no-mic { opacity: .35; cursor: not-allowed; }
+#cw-mic svg { width: 15px; height: 15px; fill: currentColor; }
+
+#cw-input {
+  flex: 1; min-height: 36px; max-height: 96px;
+  padding: 8px 13px; border-radius: 9px;
+  border: 1px solid var(--cw-border); background: var(--cw-surf2);
+  color: var(--cw-text); font-size: 13px; font-family: 'DM Sans', sans-serif;
+  resize: none; outline: none; line-height: 1.45; transition: border-color .15s;
+}
+#cw-input:focus { border-color: var(--cw-accent); }
+#cw-input::placeholder { color: var(--cw-muted); }
+
+#cw-send {
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: 9px; border: none;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: transform .14s, box-shadow .14s, opacity .14s;
+}
+#cw-send:hover { transform: scale(1.07); box-shadow: 0 4px 16px rgba(59,130,246,.45); }
+#cw-send:disabled { opacity: .38; cursor: not-allowed; transform: none; box-shadow: none; }
+#cw-send svg { width: 15px; height: 15px; fill: white; }
+
+#cw-hint {
+  font-size: 10px; font-family: 'DM Mono', monospace;
+  color: var(--cw-muted); text-align: center; margin-top: 8px;
+  min-height: 14px; transition: color .2s;
+}
+#cw-hint.active { color: var(--cw-green); }
+
+@media (max-width: 480px) {
+  #cw-win { width: calc(100vw - 24px); right: 12px; bottom: 88px; }
+  #cw-fab { right: 12px; bottom: 16px; }
+}
+</style>
+
+<!-- ════ FAB ════ -->
+</head><body><button id="cw-fab" onclick="cwToggle()" title="Ask RoadSense AI">
+  <svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h3a3 3 0 0 1 3 3v1h1a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-1v1a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h1v-1a3 3 0 0 1 3-3h3V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2zm-3 9a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-6 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"></path></svg>
+</button>
+
+<!-- ════ CHAT WINDOW ════ -->
+<div id="cw-win">
+
+  <div class="cw-hdr">
+    <div class="cw-av">🛣️</div>
+    <div class="cw-hdr-meta">
+      <div class="cw-hdr-name">RoadSense AI Agent</div>
+      <div class="cw-status"><div class="cw-status-dot"></div>Live · City database connected</div>
+    </div>
+    <div id="cw-voice-pill"><div class="cw-voice-dot"></div>Listening…</div>
+    <!-- Auto-speak toggle -->
+    <button class="cw-ibtn" id="cw-as-btn" onclick="cwAutoSpeakToggle()" title="Toggle auto-speak">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"></path></svg>
+    </button>
+    <!-- Clear -->
+    <button class="cw-ibtn" onclick="cwClear()" title="Clear conversation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg>
+    </button>
+    <!-- Close -->
+    <button class="cw-ibtn" onclick="cwToggle()" title="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+    </button>
+  </div>
+
+  <div class="cw-chips">
+    <button class="cw-chip" onclick="cwQuick('Which road needs urgent repair today?')">🔴 Worst road</button>
+    <button class="cw-chip" onclick="cwQuick('What is the city health score?')">📊 City score</button>
+    <button class="cw-chip" onclick="cwQuick('Which roads need fixing before monsoon?')">🌧️ Monsoon</button>
+    <button class="cw-chip" onclick="cwQuick('How many critical roads are there?')">⚠️ Critical count</button>
+  </div>
+
+  <div class="cw-msgs" id="cw-msgs"></div>
+
+  <div class="cw-foot">
+    <div class="cw-irow">
+      <button id="cw-mic" onclick="cwMic()" title="Click to speak">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm-1 3a1 1 0 0 1 2 0v8a1 1 0 0 1-2 0V4zM7 11a5 5 0 0 0 10 0h2a7 7 0 0 1-6 6.93V21h-2v-3.07A7 7 0 0 1 5 11h2z"></path>
+        </svg>
+      </button>
+      <textarea id="cw-input" rows="1" placeholder="Ask about roads, repairs, budget…" onkeydown="cwKey(event)" oninput="cwResize(this)"></textarea>
+      <button id="cw-send" onclick="cwSend()" title="Send">
+        <svg viewBox="0 0 24 24"><path d="M2 21L23 12 2 3v7l15 2-15 2z"></path></svg>
+      </button>
+    </div>
+    <div id="cw-hint">🔊 Click <strong>Speak</strong> on any reply &nbsp;·&nbsp; 🎙 Mic for voice input</div>
+  </div>
+
+</div>
+
+<script>
+/*
+ ╔══════════════════════════════════════════════════════════════╗
+ ║  RoadSense AI Chat Widget — Fully Fixed Voice Edition        ║
+ ║                                                              ║
+ ║  BUGS FIXED vs previous version:                             ║
+ ║  1. SyntaxError "Unexpected end of input"                    ║
+ ║     ROOT CAUSE: JSON.stringify(txt) injected raw into an     ║
+ ║     HTML onclick="cwSpeak(this, ...)" attribute. Any text    ║
+ ║     with quotes, newlines, or special chars broke the HTML   ║
+ ║     parser entirely. The page's JS wouldn't even parse.      ║
+ ║     FIX: Store text in a data-txt attribute on the button.   ║
+ ║     onclick reads btn.dataset.txt — no HTML injection risk.  ║
+ ║                                                              ║
+ ║  2. Voice / TTS not playing                                  ║
+ ║     ROOT CAUSE: synth.speak(utt) was called FIRST, then      ║
+ ║     utt.onend was assigned. Chrome starts speaking           ║
+ ║     immediately; if it ends before onend is set, the         ║
+ ║     cleanup never runs. Also: chromeKeepAlive interval       ║
+ ║     OVERWROTE utt.onend a second time (second assignment     ║
+ ║     replaced the first), so cleanup was always the           ║
+ ║     keepAlive version, not the simple one.                   ║
+ ║     FIX: Assign ALL handlers (onend, onerror) BEFORE         ║
+ ║     calling synth.speak(). Use a single onend that handles   ║
+ ║     both the keepAlive clear AND button reset.               ║
+ ║                                                              ║
+ ║  3. Speak button state stuck on "Stop"                       ║
+ ║     ROOT CAUSE: cwResetBtn() checked activeBtn === btn but   ║
+ ║     activeBtn was nulled before the check in some paths.     ║
+ ║     FIX: Always reset the passed btn reference uncondi-      ║
+ ║     tionally; null activeBtn after.                          ║
+ ╚══════════════════════════════════════════════════════════════╝
+*/
+(function () {
+  'use strict';
+
+  /* ─── STATE ────────────────────────────────────────── */
+  var isOpen      = false;
+  var isBusy      = false;
+  var autoSpeak   = false;
+  var activeBtn   = null;       // DOM button currently speaking
+  var isRecording = false;
+  var recObj      = null;
+
+  /* ─── TTS SETUP ─────────────────────────────────────── */
+  var synth       = window.speechSynthesis || null;
+  var chosenVoice = null;
+
+  function pickVoice() {
+    if (!synth) return;
+    var vs = synth.getVoices();
+    if (!vs.length) return;
+    chosenVoice =
+      vs.find(function(v){ return v.lang === 'en-IN' && v.localService; }) ||
+      vs.find(function(v){ return v.lang === 'en-IN'; }) ||
+      vs.find(function(v){ return /en[-_]IN/i.test(v.lang); }) ||
+      vs.find(function(v){ return v.lang.startsWith('en') && v.localService; }) ||
+      vs.find(function(v){ return v.lang.startsWith('en'); }) ||
+      vs[0] || null;
+  }
+
+  /* Initial pick + onChange hook */
+  pickVoice();
+  if (synth && typeof synth.onvoiceschanged !== 'undefined') {
+    synth.onvoiceschanged = pickVoice;
+  }
+  /* Polling fallback — Chrome loads voices async */
+  var _vRetry = 0;
+  var _vTimer = setInterval(function() {
+    if (chosenVoice || _vRetry++ > 20) { clearInterval(_vTimer); return; }
+    pickVoice();
+  }, 250);
+
+  /* ─── WINDOW OPEN / CLOSE ───────────────────────────── */
+  window.cwToggle = function() {
+    isOpen = !isOpen;
+    document.getElementById('cw-win').classList.toggle('cw-open', isOpen);
+    if (isOpen) {
+      if (!msgsEl().children.length) addWelcome();
+      setTimeout(function(){ document.getElementById('cw-input').focus(); }, 260);
+    } else {
+      cwStopAll();
+    }
+  };
+
+  /* ─── WELCOME ───────────────────────────────────────── */
+  function addWelcome() {
+    addBot(
+      "👋 Hello Officer! I'm the **RoadSense AI Agent**.\n\n" +
+      "I have live access to your city road database. Try:\n" +
+      "• Which roads need urgent repair?\n" +
+      "• What is the city health score?\n" +
+      "• Budget recommendations for next quarter?\n" +
+      "• Monsoon risk analysis?\n\n" +
+      "Use the quick chips above, type below, or **🎙 tap the mic** to speak."
+    );
+  }
+
+  /* ─── QUICK CHIPS ────────────────────────────────────── */
+  window.cwQuick = function(txt) {
+    document.getElementById('cw-input').value = txt;
+    cwSend();
+  };
+
+  /* ─── KEYBOARD ──────────────────────────────────────── */
+  window.cwKey = function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); cwSend(); }
+  };
+
+  /* ─── TEXTAREA AUTO-RESIZE ──────────────────────────── */
+  window.cwResize = function(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 96) + 'px';
+  };
+
+  /* ═══════════════════════════════════════════════════════
+     SEND — fetch /api/chat → render reply + speak
+  ═══════════════════════════════════════════════════════ */
+  window.cwSend = async function() {
+    var inp = document.getElementById('cw-input');
+    var txt = (inp.value || '').trim();
+    if (!txt || isBusy) return;
+
+    addUser(txt);
+    inp.value = '';
+    inp.style.height = 'auto';
+    isBusy = true;
+    document.getElementById('cw-send').disabled = true;
+
+    var typing = showTyping();
+
+    try {
+      var res  = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: txt })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var data  = await res.json();
+      var reply = (data.reply || '').trim() || 'Sorry, I received an empty response.';
+      typing.remove();
+      var spkBtn = addBot(reply);        // renders text + speak button
+      if (autoSpeak && spkBtn) {
+        setTimeout(function(){ cwStartSpeak(reply, spkBtn); }, 150);
+      }
+    } catch (err) {
+      typing.remove();
+      addBot(
+        '⚠️ **Cannot reach server.**\n\n' +
+        'Make sure Flask is running on port 5000.\n' +
+        'Error: ' + err.message
+      );
+    }
+
+    isBusy = false;
+    document.getElementById('cw-send').disabled = false;
+  };
+
+  /* ─── USER BUBBLE ────────────────────────────────────── */
+  function addUser(txt) {
+    var el = document.createElement('div');
+    el.className = 'cw-row usr';
+    el.innerHTML =
+      '<div class="cw-rav">👤</div>' +
+      '<div class="cw-bub">' + esc(txt) + '</div>';
+    msgsEl().appendChild(el);
+    scrollBottom();
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     BOT BUBBLE  +  SPEAK BUTTON
+     ─────────────────────────────────────────────────────
+     FIX: The text is stored in  data-cwtxt  on the button.
+     The onclick just calls  cwSpeak(this)  with no arguments.
+     Inside cwSpeak we read  btn.dataset.cwtxt.
+     This completely avoids injecting any text into HTML
+     attributes, which was the cause of the SyntaxError.
+  ═══════════════════════════════════════════════════════ */
+  function addBot(txt) {
+    var el  = document.createElement('div');
+    el.className = 'cw-row';
+
+    var uid = 'spk' + Date.now() + Math.floor(Math.random() * 9999);
+
+    /* Build the HTML — NO text injected into onclick */
+    el.innerHTML =
+      '<div class="cw-rav">🛣️</div>' +
+      '<div class="cw-bub">' +
+        '<div>' + fmt(txt) + '</div>' +   /* rendered text */
+        '<button class="cw-spk" id="' + uid + '" onclick="cwSpeak(this)"' +
+          ' title="Hear this reply aloud · click again to stop">' +
+          /* Static speaker icon (shown when NOT speaking) */
+          '<svg class="si" viewBox="0 0 24 24" fill="currentColor">' +
+            '<path d="M3 9v6h4l5 5V4L7 9H3z"/>' +
+            '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>' +
+          '</svg>' +
+          /* Animated bars (shown when .talking) */
+          '<span class="sb">' +
+            '<span class="cw-bar"></span>' +
+            '<span class="cw-bar"></span>' +
+            '<span class="cw-bar"></span>' +
+            '<span class="cw-bar"></span>' +
+            '<span class="cw-bar"></span>' +
+          '</span>' +
+          '<span class="cw-spk-lbl">Speak</span>' +
+        '</button>' +
+      '</div>';
+
+    msgsEl().appendChild(el);
+
+    /* ── Store the PLAIN text on the button via dataset ── */
+    /* This is safe regardless of what chars are in txt    */
+    var btn = document.getElementById(uid);
+    btn.dataset.cwtxt = txt;   /* <-- THE KEY FIX */
+
+    scrollBottom();
+    return btn;
+  }
+
+  /* ─── TYPING INDICATOR ───────────────────────────────── */
+  function showTyping() {
+    var el = document.createElement('div');
+    el.className = 'cw-row cw-typing';
+    el.innerHTML =
+      '<div class="cw-rav">🛣️</div>' +
+      '<div class="cw-bub">' +
+        '<div class="cw-dot"></div>' +
+        '<div class="cw-dot"></div>' +
+        '<div class="cw-dot"></div>' +
+      '</div>';
+    msgsEl().appendChild(el);
+    scrollBottom();
+    return el;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     TTS — cwSpeak(btn)
+     Called by the Speak button's onclick.
+     Reads the plain text from btn.dataset.cwtxt
+  ═══════════════════════════════════════════════════════ */
+  window.cwSpeak = function(btn) {
+    if (!synth) {
+      cwShowHint('⚠️ TTS not supported — try Chrome or Edge.', true);
+      return;
+    }
+    /* Same button tapped while speaking → stop */
+    if (btn.classList.contains('talking')) {
+      cwStopSpeech();
+      return;
+    }
+    /* Read text from data attribute (THE FIX) */
+    var txt = btn.dataset.cwtxt || '';
+    if (!txt) return;
+
+    cwStopSpeech();
+    cwStartSpeak(txt, btn);
+  };
+
+  /* ═══════════════════════════════════════════════════════
+     cwStartSpeak(text, btn)
+     All event handlers assigned BEFORE synth.speak()
+     — this is critical for Chrome.
+  ═══════════════════════════════════════════════════════ */
+  function cwStartSpeak(text, btn) {
+    if (!synth) return;
+
+    /* If voices not yet loaded, retry in 400ms */
+    if (!chosenVoice) {
+      pickVoice();
+      if (!chosenVoice) {
+        setTimeout(function(){ cwStartSpeak(text, btn); }, 400);
+        return;
+      }
+    }
+
+    /* Clean text for natural speech */
+    var clean = text
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g,     '$1')
+      .replace(/#{1,6}\s?/g,     '')
+      .replace(/•\s?/g,          ', ')
+      .replace(/[\n\r]+/g,       '. ')
+      .replace(/₹/g,             'Rs. ')
+      .replace(/(\d+)Cr\b/g,     '$1 crore ')
+      .replace(/(\d+)L\b/g,      '$1 lakh ')
+      .replace(/(\d+)K\b/g,      '$1 thousand ')
+      .replace(/[<>]/g,          '')
+      .replace(/\s{2,}/g,        ' ')
+      .trim();
+
+    if (!clean) return;
+
+    var utt = new SpeechSynthesisUtterance(clean);
+    utt.voice  = chosenVoice;
+    utt.lang   = 'en-IN';
+    utt.rate   = 0.92;
+    utt.pitch  = 1.0;
+    utt.volume = 1.0;
+
+    /* ── Set active button BEFORE speak ── */
+    activeBtn = btn;
+    if (btn) {
+      btn.classList.add('talking');
+      var lbl = btn.querySelector('.cw-spk-lbl');
+      if (lbl) lbl.textContent = 'Stop';
+    }
+
+    /* Chrome keep-alive: prevent synthesis from freezing mid-speech */
+    var keepAlive = null;
+
+    /* ══ CRITICAL FIX: assign ALL handlers BEFORE synth.speak() ══
+       Chrome can fire onend synchronously on short texts.
+       If we assigned after speak(), the handler would never run.  */
+    utt.onend = function() {
+      if (keepAlive) { clearInterval(keepAlive); keepAlive = null; }
+      cwResetBtn(btn);
+    };
+
+    utt.onerror = function(e) {
+      if (keepAlive) { clearInterval(keepAlive); keepAlive = null; }
+      /* 'interrupted' / 'canceled' = we called synth.cancel() — not a real error */
+      if (e.error !== 'interrupted' && e.error !== 'canceled') {
+        console.warn('[CW-TTS] error:', e.error);
+      }
+      cwResetBtn(btn);
+    };
+
+    /* NOW speak */
+    synth.speak(utt);
+
+    /* Start keep-alive AFTER speak (Chrome bug: long utterances freeze) */
+    keepAlive = setInterval(function() {
+      if (!synth.speaking) { clearInterval(keepAlive); keepAlive = null; return; }
+      synth.pause();
+      synth.resume();
+    }, 10000);
+  }
+
+  /* ─── Stop all speech ───────────────────────────────── */
+  function cwStopSpeech() {
+    if (synth) synth.cancel();
+    if (activeBtn) cwResetBtn(activeBtn);
+    activeBtn = null;
+  }
+
+  /* ─── Reset a speak button to idle ─────────────────── */
+  function cwResetBtn(btn) {
+    if (!btn) return;
+    btn.classList.remove('talking');
+    var lbl = btn.querySelector('.cw-spk-lbl');
+    if (lbl) lbl.textContent = 'Speak';
+    /* null activeBtn only if it's still this button */
+    if (activeBtn === btn) activeBtn = null;
+  }
+
+  /* ─── Auto-speak toggle ─────────────────────────────── */
+  window.cwAutoSpeakToggle = function() {
+    autoSpeak = !autoSpeak;
+    var btn = document.getElementById('cw-as-btn');
+    btn.classList.toggle('cw-on', autoSpeak);
+    btn.title = autoSpeak ? 'Auto-speak ON — click to disable' : 'Enable auto-speak';
+    cwShowHint(
+      autoSpeak
+        ? '🔊 Auto-speak <strong>ON</strong> — every reply spoken aloud'
+        : '🔊 Click <strong>Speak</strong> on any reply · 🎙 Mic for voice input',
+      autoSpeak
+    );
+  };
+
+  /* ═══════════════════════════════════════════════════════
+     STT — microphone input
+  ═══════════════════════════════════════════════════════ */
+  window.cwMic = function() {
+    if (isRecording) { cwStopMic(); return; }
+
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      addBot(
+        '⚠️ **Voice input not supported in this browser.**\n\n' +
+        'Please use **Google Chrome** or **Microsoft Edge** for microphone input.\n' +
+        'You can still type your question below.'
+      );
+      document.getElementById('cw-mic').classList.add('no-mic');
+      return;
+    }
+
+    /* Stop TTS before recording to prevent feedback loop */
+    cwStopSpeech();
+
+    recObj = new SR();
+    recObj.lang            = 'en-IN';
+    recObj.continuous      = false;
+    recObj.interimResults  = false;
+    recObj.maxAlternatives = 1;
+
+    isRecording = true;
+    cwSetMicUI(true);
+
+    recObj.onresult = function(e) {
+      var t = (e.results[0] && e.results[0][0] && e.results[0][0].transcript) || '';
+      t = t.trim();
+      if (t) {
+        document.getElementById('cw-input').value = t;
+        cwShowHint('🎙 Heard: "' + t.substring(0, 50) + (t.length > 50 ? '…' : '') + '"', true);
+        setTimeout(function(){ cwSend(); }, 120);
+      } else {
+        cwShowHint("🎙 Couldn't hear clearly — please try again.", true);
+      }
+    };
+
+    recObj.onerror = function(e) {
+      var m = {
+        'not-allowed'  : '🎙 Mic access denied — allow mic in browser settings.',
+        'no-speech'    : '🎙 No speech detected — please try again.',
+        'audio-capture': '🎙 Microphone not found or unavailable.',
+        'network'      : '🎙 Network error during recognition.',
+        'aborted'      : null
+      };
+      if (m[e.error]) cwShowHint(m[e.error], true);
+      cwStopMic();
+    };
+
+    recObj.onend = function() { cwStopMic(); };
+
+    try { recObj.start(); }
+    catch(err) { console.warn('[CW-STT]', err); cwStopMic(); }
+  };
+
+  function cwStopMic() {
+    isRecording = false;
+    cwSetMicUI(false);
+    if (recObj) {
+      try { recObj.stop(); } catch(e) {}
+      recObj = null;
+    }
+  }
+
+  function cwSetMicUI(active) {
+    var mic  = document.getElementById('cw-mic');
+    var pill = document.getElementById('cw-voice-pill');
+    mic.classList.toggle('rec', active);
+    mic.title = active ? 'Recording… click to stop' : 'Click to speak';
+    pill.classList.toggle('show', active);
+    if (active) {
+      cwShowHint('🎙 Listening… speak your question now', true);
+    } else if (!autoSpeak) {
+      cwShowHint('🔊 Click <strong>Speak</strong> on any reply · 🎙 Mic for voice input', false);
+    }
+  }
+
+  /* ─── Stop speech + mic ─────────────────────────────── */
+  function cwStopAll() { cwStopSpeech(); cwStopMic(); }
+
+  /* ─── Clear chat ────────────────────────────────────── */
+  window.cwClear = function() {
+    cwStopAll();
+    msgsEl().innerHTML = '';
+    addWelcome();
+  };
+
+  /* ─── Hint bar ──────────────────────────────────────── */
+  function cwShowHint(html, highlight) {
+    var el = document.getElementById('cw-hint');
+    el.innerHTML = html;
+    el.classList.toggle('active', !!highlight);
+    if (highlight) {
+      clearTimeout(el._t);
+      el._t = setTimeout(function() {
+        el.classList.remove('active');
+        if (!autoSpeak) el.innerHTML = '🔊 Click <strong>Speak</strong> on any reply · 🎙 Mic for voice input';
+      }, 4000);
+    }
+  }
+
+  /* ─── DOM helpers ────────────────────────────────────── */
+  function msgsEl()    { return document.getElementById('cw-msgs'); }
+  function scrollBottom() {
+    setTimeout(function(){
+      var m = msgsEl();
+      m.scrollTop = m.scrollHeight;
+    }, 50);
+  }
+
+  /* Escape HTML special chars in plain text */
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /* Convert markdown-lite to safe HTML for display */
+  function fmt(s) {
+    return esc(s)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g,     '<em>$1</em>')
+      .replace(/\n/g,            '<br>')
+      .replace(/•\s/g,           '&bull; ');
+  }
+
+}());
+</script></body></html>

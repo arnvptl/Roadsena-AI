@@ -4,251 +4,490 @@
 
 {% block head %}
 <style>
+  /* ── Upload zone ─────────────────────────────────────── */
   .upload-zone {
-    border: 3px dashed #ccc; border-radius: 14px; padding: 50px 30px;
-    text-align: center; cursor: pointer; transition: .2s;
-    background: #fafafa;
+    border:3px dashed #ccc; border-radius:14px; padding:40px 24px;
+    text-align:center; cursor:pointer; transition:.2s; background:#fafafa;
   }
-  .upload-zone:hover, .upload-zone.drag-over {
-    border-color: #e94560; background: #fff5f7;
-  }
-  .upload-zone i { font-size: 3rem; color: #ccc; margin-bottom: 14px; }
-  .upload-zone.has-file i { color: #e94560; }
-  .upload-zone.has-file { border-color: #e94560; background: #fff5f7; }
+  .upload-zone:hover, .upload-zone.drag-over { border-color:#e94560; background:#fff5f7; }
+  .upload-zone i { font-size:2.5rem; color:#ccc; margin-bottom:12px; }
+  .upload-zone.has-file i { color:#e94560; }
+  .upload-zone.has-file   { border-color:#e94560; background:#fff5f7; }
+
+  /* ── Progress ────────────────────────────────────────── */
   .progress-section { display:none; }
-  .result-section { display:none; }
-  .result-item { background:#f8f9fa; border-radius:8px; padding:10px 14px; margin-bottom:8px; font-size:.83rem; border-left:4px solid #ccc; }
-  .result-item.defect { border-left-color: #e94560; }
+
+  /* ── Summary cards ───────────────────────────────────── */
+  .stat-card {
+    background:#fff; border-radius:10px; padding:14px 10px;
+    text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.07);
+  }
+  .stat-card .value { font-size:2rem; font-weight:900; line-height:1.1; }
+  .stat-card .label { font-size:.72rem; color:#888; margin-top:2px; }
+
+  /* ── Frame grid ─────────────────────────────────────── */
+  .frame-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+  .frame-card {
+    border-radius:10px; overflow:hidden; border:2px solid #e5e7eb;
+    font-size:.72rem; background:#fff; transition:.15s;
+  }
+  .frame-card:hover { border-color:#e94560; box-shadow:0 4px 14px rgba(233,69,96,.15); }
+  .frame-card.defect { border-color:#fca5a5; }
+  .frame-card.clear  { border-color:#86efac; }
+  .frame-header {
+    padding:6px 9px; font-weight:700; font-size:.73rem;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .frame-header.defect { background:#fff1f2; color:#be123c; }
+  .frame-header.clear  { background:#f0fdf4; color:#166534; }
+  .frame-thumb {
+    width:100%; aspect-ratio:16/9; object-fit:cover; display:block;
+    background:#f3f4f6;
+  }
+  .frame-body { padding:7px 9px; line-height:1.55; }
+  .badge-defect { background:#fee2e2; color:#b91c1c; border-radius:4px; padding:1px 5px; font-size:.65rem; font-weight:700; }
+  .badge-clear  { background:#dcfce7; color:#166534; border-radius:4px; padding:1px 5px; font-size:.65rem; font-weight:700; }
+
+  /* ── Type table ─────────────────────────────────────── */
+  .type-table { font-size:.8rem; width:100%; border-collapse:collapse; }
+  .type-table th { background:#1a1a2e; color:#fff; padding:7px 10px; }
+  .type-table td { padding:6px 10px; border-bottom:1px solid #f0f0f0; }
+  .type-table tr:nth-child(even) td { background:#f8f8f8; }
+
+  /* ── Filter bar ─────────────────────────────────────── */
+  .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .filter-bar button {
+    padding:5px 14px; border-radius:20px; border:2px solid #e5e7eb;
+    background:#fff; font-size:.75rem; cursor:pointer; font-weight:600; transition:.15s;
+  }
+  .filter-bar button.active { background:#e94560; border-color:#e94560; color:#fff; }
+
+  /* ── Mobile ──────────────────────────────────────────── */
+  @media(max-width:576px) {
+    .upload-zone { padding:28px 16px; }
+    .upload-zone i { font-size:2rem; }
+    .frame-grid { grid-template-columns:repeat(2,1fr); }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row g-3">
+
+  <!-- ── LEFT: Upload form ──────────────────────────────────────────────── -->
   <div class="col-lg-7">
-    <div class="card mb-4">
-      <div class="card-header py-3 px-4">
+
+    <!-- Upload card -->
+    <div class="card mb-3">
+      <div class="card-header py-3 px-4" style="font-size:.9rem">
         <i class="fas fa-film me-2 text-danger"></i>Upload Dashcam Video
       </div>
-      <div class="card-body p-4">
-        <p class="text-muted mb-4" style="font-size:.85rem">Upload a .mp4 dashcam video file recorded while driving. The system will automatically extract one frame every 2 seconds and run AI detection on each frame.</p>
+      <div class="card-body p-3 p-md-4">
+        <p class="text-muted mb-3" style="font-size:.82rem">
+          Upload a dashcam .mp4 video. The AI samples <strong>one frame every 2 seconds</strong>,
+          annotates every frame (defect or clear), counts potholes per frame, and produces a
+          downloadable PDF with all frames marked up.
+        </p>
 
-        <!-- Upload Zone -->
-        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('video-file').click()"
+        <div class="upload-zone" id="upload-zone"
+             onclick="document.getElementById('video-file').click()"
              ondragover="event.preventDefault();this.classList.add('drag-over')"
              ondragleave="this.classList.remove('drag-over')"
              ondrop="handleDrop(event)">
           <i class="fas fa-cloud-upload-alt" id="upload-icon"></i>
           <div id="upload-text">
-            <p style="font-weight:700;color:#333">Click to select video or drag & drop</p>
-            <p style="color:#aaa;font-size:.8rem">Supports .mp4, .avi, .mov · Max 500MB</p>
+            <p style="font-weight:700;color:#333;margin-bottom:4px">Tap to select video or drag & drop</p>
+            <p style="color:#aaa;font-size:.76rem">Supports .mp4, .avi, .mov · Max 500 MB</p>
           </div>
         </div>
         <input type="file" id="video-file" accept="video/*" style="display:none" onchange="fileSelected(this)"/>
 
-        <!-- Road name + GPS -->
-        <div class="row mt-4 g-3">
-          <div class="col-md-12">
-            <label class="form-label fw-bold" style="font-size:.8rem">Road Name</label>
+        <div class="row mt-3 g-2">
+          <div class="col-12">
+            <label class="form-label fw-bold" style="font-size:.78rem">Road Name</label>
             <input type="text" id="vid-road" class="form-control" placeholder="e.g. MG Road" value="MG Road"/>
           </div>
-          <div class="col-md-5">
-            <label class="form-label fw-bold" style="font-size:.8rem">Latitude</label>
+          <div class="col-5">
+            <label class="form-label fw-bold" style="font-size:.78rem">Latitude</label>
             <input type="number" id="vid-lat" class="form-control" step="any" value="17.6868"/>
           </div>
-          <div class="col-md-5">
-            <label class="form-label fw-bold" style="font-size:.8rem">Longitude</label>
+          <div class="col-5">
+            <label class="form-label fw-bold" style="font-size:.78rem">Longitude</label>
             <input type="number" id="vid-lng" class="form-control" step="any" value="75.9079"/>
           </div>
-          <div class="col-md-2 d-flex align-items-end">
-            <button type="button" onclick="detectGPS()" class="btn btn-outline-primary w-100" style="font-size:.8rem" title="Auto-detect your current location">
-              <i class="fas fa-location-crosshairs"></i> GPS
+          <div class="col-2 d-flex align-items-end">
+            <button type="button" onclick="detectGPS()" class="btn btn-outline-primary w-100"
+                    style="font-size:.78rem;padding:9px 6px" title="Auto-detect GPS">
+              <i class="fas fa-location-crosshairs"></i>
             </button>
           </div>
         </div>
-        <div id="gps-feedback" style="margin-top:6px;font-size:.75rem;color:#888">
-          <i class="fas fa-info-circle me-1"></i>
-          Click GPS to auto-fill your current location, or enter coordinates manually.
-          These coordinates will be used as the map marker location for all detections in this video.
+        <div id="gps-feedback" style="margin-top:5px;font-size:.72rem;color:#888">
+          <i class="fas fa-info-circle me-1"></i>Click the GPS button to auto-fill your location.
         </div>
 
-        <button id="process-btn" class="btn btn-danger mt-4 w-100 fw-bold py-2" onclick="processVideo()" disabled>
+        <button id="process-btn" class="btn btn-danger mt-3 w-100 fw-bold py-2"
+                onclick="processVideo()" disabled>
           <i class="fas fa-cogs me-2"></i>Process Video
         </button>
       </div>
     </div>
 
-    <!-- Progress -->
-    <div class="card mb-4 progress-section" id="progress-section">
-      <div class="card-body p-4">
-        <h6 class="fw-bold mb-3"><i class="fas fa-spinner fa-spin me-2 text-danger"></i>Processing Video…</h6>
-        <div class="progress mb-2" style="height:10px;border-radius:5px">
-          <div id="progress-bar" class="progress-bar bg-danger" role="progressbar" style="width:0%"></div>
+    <!-- Progress bar -->
+    <div class="card mb-3 progress-section" id="progress-section">
+      <div class="card-body p-3">
+        <h6 class="fw-bold mb-3" style="font-size:.88rem">
+          <i class="fas fa-spinner fa-spin me-2 text-danger"></i>Processing Video…
+        </h6>
+        <div class="progress mb-2" style="height:9px;border-radius:5px">
+          <div id="progress-bar" class="progress-bar bg-danger" style="width:0%"></div>
         </div>
-        <small id="progress-text" class="text-muted">Extracting frames and running AI…</small>
+        <small id="progress-text" class="text-muted">Uploading video…</small>
       </div>
     </div>
 
     <!-- Results -->
-    <div class="card result-section" id="result-section">
-      <div class="card-header py-3 px-4 fw-bold">
-        <i class="fas fa-poll me-2 text-success"></i>Processing Results
+    <div id="result-section" style="display:none">
+
+      <!-- Summary stat cards -->
+      <div class="row g-2 mb-3" id="stat-row"></div>
+
+      <!-- Defect type breakdown -->
+      <div class="card mb-3" id="type-card" style="display:none">
+        <div class="card-header py-2 px-4 fw-bold" style="font-size:.85rem">
+          <i class="fas fa-bug me-2 text-danger"></i>Defect Type Breakdown
+        </div>
+        <div class="card-body p-0">
+          <table class="type-table">
+            <thead><tr>
+              <th>Defect Type</th>
+              <th>Frames Detected In</th>
+              <th>Note</th>
+            </tr></thead>
+            <tbody id="type-table-body"></tbody>
+          </table>
+        </div>
       </div>
-      <div class="card-body p-4" id="result-body"></div>
+
+      <!-- Action buttons -->
+      <div class="d-flex gap-2 mb-3 flex-wrap" id="action-btns" style="display:none!important"></div>
+
+      <!-- Frame grid -->
+      <div class="card">
+        <div class="card-header py-2 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span class="fw-bold" style="font-size:.85rem">
+            <i class="fas fa-images me-2 text-primary"></i>All Frames (every 2 s)
+          </span>
+          <div class="filter-bar mb-0">
+            <button class="active" onclick="filterFrames('all',this)">All</button>
+            <button onclick="filterFrames('defect',this)">Defects Only</button>
+            <button onclick="filterFrames('clear',this)">Clear Only</button>
+          </div>
+        </div>
+        <div class="card-body p-3">
+          <div class="frame-grid" id="frame-grid"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /col-lg-7 -->
+
+  <!-- ── RIGHT: How it works ───────────────────────────────────────────── -->
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header py-3 px-4 fw-bold" style="font-size:.88rem">
+        <i class="fas fa-info-circle me-2 text-info"></i>How It Works
+      </div>
+      <div class="card-body p-3" style="font-size:.8rem;color:#555;line-height:1.7">
+
+        <div class="d-flex gap-2 mb-3">
+          <div style="width:28px;height:28px;background:#e94560;color:#fff;border-radius:50%;
+                      display:flex;align-items:center;justify-content:center;
+                      font-weight:700;flex-shrink:0;font-size:.85rem">1</div>
+          <div><strong>Upload Video</strong><br>Any dashcam .mp4 from driving on city roads.</div>
+        </div>
+        <div class="d-flex gap-2 mb-3">
+          <div style="width:28px;height:28px;background:#e94560;color:#fff;border-radius:50%;
+                      display:flex;align-items:center;justify-content:center;
+                      font-weight:700;flex-shrink:0;font-size:.85rem">2</div>
+          <div><strong>Frame Extraction (every 2 s)</strong><br>
+            OpenCV extracts one frame per 2 seconds of footage.
+            Every frame is processed — not just defect ones.
+          </div>
+        </div>
+        <div class="d-flex gap-2 mb-3">
+          <div style="width:28px;height:28px;background:#e94560;color:#fff;border-radius:50%;
+                      display:flex;align-items:center;justify-content:center;
+                      font-weight:700;flex-shrink:0;font-size:.85rem">3</div>
+          <div><strong>AI Analysis + Exact Count</strong><br>
+            YOLOv8 annotates bounding boxes on every defect.
+            The system counts potholes <em>per frame</em> and
+            estimates unique potholes from the peak frame count
+            (so a pothole in 4 consecutive frames still counts as 1).
+          </div>
+        </div>
+        <div class="d-flex gap-2 mb-3">
+          <div style="width:28px;height:28px;background:#e94560;color:#fff;border-radius:50%;
+                      display:flex;align-items:center;justify-content:center;
+                      font-weight:700;flex-shrink:0;font-size:.85rem">4</div>
+          <div><strong>PDF with All Frames</strong><br>
+            Download a full PDF — every 2-second frame in a grid,
+            annotated images with bounding boxes, per-frame score,
+            and a cover summary showing unique pothole count.
+          </div>
+        </div>
+
+        <div class="alert alert-info py-2 mt-2" style="font-size:.75rem">
+          <i class="fas fa-clock me-1"></i>A 10-min video (~300 frames) takes about 2–3 min.
+        </div>
+        <div class="alert alert-warning py-2" style="font-size:.75rem">
+          <i class="fas fa-map-pin me-1"></i>The GPS you enter applies to all detections in this video.
+        </div>
+        <div class="alert alert-success py-2" style="font-size:.75rem">
+          <i class="fas fa-file-pdf me-1"></i>The PDF includes <strong>every frame</strong> with
+          annotations. Defect frames show coloured bounding boxes; clear frames show a green ✓ banner.
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Right: How it works -->
-  <div class="col-lg-5">
-    <div class="card">
-      <div class="card-header py-3 px-4 fw-bold"><i class="fas fa-info-circle me-2 text-info"></i>How Batch Processing Works</div>
-      <div class="card-body p-4" style="font-size:.84rem;color:#555;line-height:1.8">
-        <div class="d-flex gap-3 mb-3">
-          <div style="width:30px;height:30px;background:#e94560;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">1</div>
-          <div><strong>Upload Video</strong><br>Any dashcam .mp4 file recorded while driving on city roads.</div>
-        </div>
-        <div class="d-flex gap-3 mb-3">
-          <div style="width:30px;height:30px;background:#e94560;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">2</div>
-          <div><strong>Frame Extraction</strong><br>OpenCV automatically extracts one frame every 2 seconds — same as live inspection.</div>
-        </div>
-        <div class="d-flex gap-3 mb-3">
-          <div style="width:30px;height:30px;background:#e94560;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">3</div>
-          <div><strong>AI Analysis</strong><br>YOLOv8 checks each frame for potholes and cracks. Scores are calculated for each detection.</div>
-        </div>
-        <div class="d-flex gap-3 mb-3">
-          <div style="width:30px;height:30px;background:#e94560;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">4</div>
-          <div><strong>Results Saved</strong><br>All detections appear on the City Map, Repair Queue, and History automatically.</div>
-        </div>
-        <div class="alert alert-info py-2 mt-3" style="font-size:.78rem">
-          <i class="fas fa-clock me-1"></i>A 10-minute video (300 frames) takes about 2–3 minutes to process.
-        </div>
-        <div class="alert alert-warning py-2" style="font-size:.78rem">
-          <i class="fas fa-map-pin me-1"></i>Note: Since video files don't have GPS, the GPS coordinates you enter above will be used for all detections from this video.
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+</div><!-- /row -->
 {% endblock %}
 
 {% block scripts %}
 <script>
 let selectedFile = null;
+let currentVideoId = null;
+let allFrames = [];
 
-function fileSelected(input){
+/* ── File selection ─────────────────────────────────────────────── */
+function fileSelected(input) {
   selectedFile = input.files[0];
-  if(!selectedFile) return;
+  if (!selectedFile) return;
   const zone = document.getElementById("upload-zone");
   zone.classList.add("has-file");
   document.getElementById("upload-icon").className = "fas fa-check-circle";
   document.getElementById("upload-text").innerHTML =
     `<p style="font-weight:700;color:#e94560">✅ ${selectedFile.name}</p>
-     <p style="color:#aaa;font-size:.8rem">${(selectedFile.size/1024/1024).toFixed(1)} MB</p>`;
+     <p style="color:#aaa;font-size:.76rem">${(selectedFile.size/1024/1024).toFixed(1)} MB</p>`;
   document.getElementById("process-btn").disabled = false;
 }
 
-function handleDrop(e){
+function handleDrop(e) {
   e.preventDefault();
   document.getElementById("upload-zone").classList.remove("drag-over");
   const file = e.dataTransfer.files[0];
-  if(file && file.type.startsWith("video/")){
+  if (file && file.type.startsWith("video/")) {
     document.getElementById("video-file").files = e.dataTransfer.files;
-    fileSelected({files:[file]});
+    fileSelected({ files: [file] });
   }
 }
 
-function processVideo(){
-  if(!selectedFile){ alert("Please select a video file."); return; }
-  const road = document.getElementById("vid-road").value||"Unknown Road";
-  const lat  = document.getElementById("vid-lat").value||17.6868;
-  const lng  = document.getElementById("vid-lng").value||75.9079;
+/* ── GPS ────────────────────────────────────────────────────────── */
+function detectGPS() {
+  const btn = document.querySelector('[onclick="detectGPS()"]');
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById("vid-lat").value = pos.coords.latitude.toFixed(6);
+    document.getElementById("vid-lng").value = pos.coords.longitude.toFixed(6);
+    document.getElementById("gps-feedback").innerHTML =
+      `<i class="fas fa-check-circle text-success me-1"></i>
+       Location detected: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+    btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+  }, () => {
+    document.getElementById("gps-feedback").innerHTML =
+      '<i class="fas fa-exclamation-triangle text-warning me-1"></i>Could not get location — enter manually.';
+    btn.innerHTML = '<i class="fas fa-location-crosshairs"></i>';
+  }, { enableHighAccuracy: true, timeout: 8000 });
+}
+
+/* ── Process ────────────────────────────────────────────────────── */
+function processVideo() {
+  if (!selectedFile) { alert("Please select a video file."); return; }
+  const road = document.getElementById("vid-road").value || "Unknown Road";
+  const lat  = document.getElementById("vid-lat").value  || 17.6868;
+  const lng  = document.getElementById("vid-lng").value  || 75.9079;
 
   const formData = new FormData();
-  formData.append("video", selectedFile);
+  formData.append("video",     selectedFile);
   formData.append("road_name", road);
-  formData.append("lat", lat);
-  formData.append("lng", lng);
+  formData.append("lat",       lat);
+  formData.append("lng",       lng);
 
-  // Show progress
   document.getElementById("progress-section").style.display = "block";
   document.getElementById("result-section").style.display   = "none";
   document.getElementById("process-btn").disabled = true;
 
-  // Animate progress (fake progress since we don't have streaming)
   let prog = 0;
-  const progInterval = setInterval(()=>{
-    prog = Math.min(prog + 2, 90);
-    document.getElementById("progress-bar").style.width = prog+"%";
+  const pi = setInterval(() => {
+    prog = Math.min(prog + 1.5, 88);
+    document.getElementById("progress-bar").style.width = prog + "%";
     document.getElementById("progress-text").textContent =
-      prog<30?"Uploading video…":prog<60?"Extracting frames…":"Running AI detection…";
-  }, 500);
+      prog < 20 ? "Uploading video…"
+      : prog < 50 ? "Extracting frames every 2 seconds…"
+      : prog < 80 ? "Running YOLO AI on each frame…"
+      : "Compiling results…";
+  }, 600);
 
-  fetch("/api/process-video",{method:"POST", body:formData})
-    .then(r=>r.json()).then(d=>{
-      clearInterval(progInterval);
+  fetch("/api/process-video", { method: "POST", body: formData })
+    .then(r => r.json())
+    .then(d => {
+      clearInterval(pi);
       document.getElementById("progress-bar").style.width = "100%";
-      setTimeout(()=>{
+      setTimeout(() => {
         document.getElementById("progress-section").style.display = "none";
         showResults(d);
-      }, 600);
-    }).catch(err=>{
-      clearInterval(progInterval);
+      }, 500);
+    })
+    .catch(err => {
+      clearInterval(pi);
       document.getElementById("progress-section").style.display = "none";
       document.getElementById("process-btn").disabled = false;
-      alert("Error processing video: "+err.message);
+      alert("Error processing video: " + err.message);
     });
 }
 
-function detectGPS(){
-  const btn = document.querySelector('[onclick="detectGPS()"]');
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-  if(!navigator.geolocation){ alert("Geolocation not supported."); return; }
-  navigator.geolocation.getCurrentPosition(pos=>{
-    document.getElementById("vid-lat").value = pos.coords.latitude.toFixed(6);
-    document.getElementById("vid-lng").value = pos.coords.longitude.toFixed(6);
-    document.getElementById("gps-feedback").innerHTML =
-      '<i class="fas fa-check-circle text-success me-1"></i>Location detected: '
-      +pos.coords.latitude.toFixed(4)+', '+pos.coords.longitude.toFixed(4)
-      +' (accuracy: ±'+Math.round(pos.coords.accuracy)+'m)';
-    btn.innerHTML = '<i class="fas fa-check text-success"></i>';
-  }, err=>{
-    document.getElementById("gps-feedback").innerHTML =
-      '<i class="fas fa-exclamation-triangle text-warning me-1"></i>Could not get location — enter manually.';
-    btn.innerHTML = '<i class="fas fa-location-crosshairs"></i> GPS';
-  }, {enableHighAccuracy:true, timeout:8000});
+/* ── Results ────────────────────────────────────────────────────── */
+function showResults(d) {
+  currentVideoId = d.video_id;
+  allFrames      = d.results || [];
+
+  document.getElementById("result-section").style.display = "block";
+
+  /* ── Stat cards ──────────────────────────────── */
+  const defectCount = allFrames.filter(f => f.has_defects).length;
+  const clearCount  = allFrames.length - defectCount;
+  const dur = d.duration_sec
+    ? `${Math.floor(d.duration_sec/60)}m ${Math.round(d.duration_sec%60)}s`
+    : "—";
+
+  document.getElementById("stat-row").innerHTML = `
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="value" style="color:#1a1a2e">${d.frames_analyzed}</div>
+      <div class="label">Frames Analyzed</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="value" style="color:#e94560">${d.unique_potholes}</div>
+      <div class="label">Unique Potholes</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="value" style="color:#f97316">${defectCount}</div>
+      <div class="label">Defect Frames</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="value" style="color:#22c55e">${clearCount}</div>
+      <div class="label">Clear Frames</div>
+    </div></div>
+    <div class="col-6 col-md-3 mt-2"><div class="stat-card">
+      <div class="value" style="color:#3b82f6;font-size:1.4rem">${dur}</div>
+      <div class="label">Video Duration</div>
+    </div></div>
+    <div class="col-6 col-md-3 mt-2"><div class="stat-card">
+      <div class="value" style="color:#6366f1;font-size:1.4rem">${d.city_health}</div>
+      <div class="label">City Health</div>
+    </div></div>
+    <div class="col-12 col-md-6 mt-2 d-flex gap-2 flex-wrap align-items-center" id="action-btns">
+      <a href="/city-map"     class="btn btn-dark btn-sm"><i class="fas fa-map me-1"></i>City Map</a>
+      <a href="/repair-queue" class="btn btn-danger btn-sm"><i class="fas fa-list me-1"></i>Queue</a>
+      <a href="/history"      class="btn btn-outline-secondary btn-sm"><i class="fas fa-history me-1"></i>History</a>
+      <button onclick="downloadPDF()" class="btn btn-primary btn-sm fw-bold">
+        <i class="fas fa-file-pdf me-1"></i>Download PDF (All Frames)
+      </button>
+    </div>`;
+
+  /* ── Type table ──────────────────────────────── */
+  const types = d.total_type_counts || [];
+  if (types.length) {
+    document.getElementById("type-card").style.display = "block";
+    document.getElementById("type-table-body").innerHTML = types.map(t =>
+      `<tr>
+         <td><strong>${t.label}</strong></td>
+         <td>${t.count}</td>
+         <td style="font-size:.73rem;color:#888">${t.count > 3
+           ? "⚠ Same defect likely seen in consecutive frames" : "—"}</td>
+       </tr>`
+    ).join("") +
+    `<tr style="background:#fef9c3">
+       <td><strong>Unique Potholes (estimated)</strong></td>
+       <td><strong>${d.unique_potholes}</strong></td>
+       <td style="font-size:.73rem;color:#888">Peak count in any single frame</td>
+     </tr>`;
+  }
+
+  /* ── Frame grid ──────────────────────────────── */
+  renderFrameGrid(allFrames);
 }
 
-function showResults(d){
-  const section = document.getElementById("result-section");
-  const body    = document.getElementById("result-body");
-  section.style.display = "block";
+function renderFrameGrid(frames) {
+  const grid = document.getElementById("frame-grid");
+  if (!frames.length) {
+    grid.innerHTML = '<p class="text-muted" style="font-size:.82rem">No frames to display.</p>';
+    return;
+  }
+  grid.innerHTML = frames.map(fr => {
+    const isDefect = fr.has_defects;
+    const badge    = isDefect
+      ? `<span class="badge-defect">⚠ DEFECT</span>`
+      : `<span class="badge-clear">✓ CLEAR</span>`;
 
-  const found = d.defects_found||0;
-  body.innerHTML = `
-    <div class="row g-3 mb-4">
-      <div class="col-4 text-center">
-        <div style="font-size:2rem;font-weight:900;color:#1a1a2e">${d.frames_analyzed||0}</div>
-        <div style="font-size:.75rem;color:#888">Frames Analyzed</div>
-      </div>
-      <div class="col-4 text-center">
-        <div style="font-size:2rem;font-weight:900;color:#e94560">${found}</div>
-        <div style="font-size:.75rem;color:#888">Defects Found</div>
-      </div>
-      <div class="col-4 text-center">
-        <div style="font-size:2rem;font-weight:900;color:#28a745">${d.city_health||'—'}</div>
-        <div style="font-size:.75rem;color:#888">City Health Score</div>
-      </div>
-    </div>
-    <hr/>
-    <p class="fw-bold mb-3" style="font-size:.85rem">Detection Events:</p>
-    ${(d.results||[]).length?d.results.map(r=>`
-      <div class="result-item defect">
-        <strong>Frame ${r.frame}</strong> — Score: ${r.score}/10 — Level: ${r.level}
-      </div>`).join(""):'<div class="result-item">No defects detected in this video.</div>'}
-    <div class="d-flex gap-2 mt-4 flex-wrap">
-      <a href="/city-map" class="btn btn-dark"><i class="fas fa-map me-1"></i>View on City Map</a>
-      <a href="/repair-queue" class="btn btn-danger"><i class="fas fa-list me-1"></i>View Repair Queue</a>
-      <a href="/history" class="btn btn-outline-secondary"><i class="fas fa-history me-1"></i>View History</a>
-    </div>`;
+    /* Detection breakdown for this frame */
+    let detLines = "";
+    if (isDefect && fr.type_counts) {
+      detLines = Object.entries(fr.type_counts)
+        .map(([k,v]) => `<span style="color:#dc2626">${k}: <strong>${v}</strong></span>`)
+        .join("  ·  ");
+    } else {
+      detLines = `<span style="color:#16a34a">No defects</span>`;
+    }
+
+    const imgTag = fr.img_url
+      ? `<img src="${fr.img_url}" class="frame-thumb" loading="lazy"
+              alt="Frame ${fr.frame_num}" onerror="this.style.display='none'">`
+      : `<div class="frame-thumb d-flex align-items-center justify-content-center"
+              style="background:#f3f4f6;color:#9ca3af;font-size:.75rem">No image</div>`;
+
+    return `
+      <div class="frame-card ${isDefect ? 'defect' : 'clear'}"
+           data-type="${isDefect ? 'defect' : 'clear'}">
+        <div class="frame-header ${isDefect ? 'defect' : 'clear'}">
+          <span>⏱ ${fr.timestamp}</span>
+          ${badge}
+        </div>
+        ${imgTag}
+        <div class="frame-body">
+          <div style="font-weight:700;margin-bottom:3px">
+            Score: <span style="color:${fr.color}">${fr.score}/10</span>
+            &nbsp;·&nbsp;${fr.level}
+          </div>
+          <div style="margin-top:3px">${detLines}</div>
+          <div style="color:#9ca3af;margin-top:2px">Frame #${fr.frame}</div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+/* ── Filter ─────────────────────────────────────────────────────── */
+function filterFrames(type, btn) {
+  document.querySelectorAll(".filter-bar button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  const filtered = type === "all"    ? allFrames
+                 : type === "defect" ? allFrames.filter(f => f.has_defects)
+                 :                     allFrames.filter(f => !f.has_defects);
+  renderFrameGrid(filtered);
+}
+
+/* ── PDF download ───────────────────────────────────────────────── */
+function downloadPDF() {
+  if (!currentVideoId) { alert("No video processed yet."); return; }
+  const btn = document.querySelector('[onclick="downloadPDF()"]');
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Generating PDF…';
+  btn.disabled  = true;
+  window.location.href = `/api/video-report/${currentVideoId}`;
+  setTimeout(() => {
+    btn.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Download PDF (All Frames)';
+    btn.disabled  = false;
+  }, 4000);
 }
 </script>
 {% endblock %}

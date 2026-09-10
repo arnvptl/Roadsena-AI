@@ -45,7 +45,21 @@
     .official-link { text-align:center; margin-top:20px; }
     .official-link a { color:rgba(255,255,255,.35); font-size:.76rem; text-decoration:none; }
     .official-link a:hover { color:#e94560; }
-  </style>
+  
+    /* Mobile improvements */
+    @media (max-width: 480px) {
+      body { padding: 12px; }
+      .report-card { padding: 22px 18px; }
+      .upload-zone { padding: 28px 16px; }
+      .btn-submit { padding: 14px; font-size: .95rem; min-height: 50px; }
+      .form-control, .form-select { padding: 11px 12px; min-height: 44px; }
+      .result-card { padding: 16px; }
+    }
+    /* Safe area for notched phones */
+    @supports (padding: max(0px)) {
+      body { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+    }
+</style>
 </head>
 <body>
 <div class="report-card">
@@ -61,10 +75,10 @@
        ondragleave="this.classList.remove('drag-over')"
        ondrop="handleDrop(event)">
     <i class="fas fa-camera" id="upload-icon"></i>
-    <p id="upload-text" style="color:rgba(255,255,255,.5);margin:0;font-size:.85rem">Tap to take photo or upload from gallery</p>
+    <p id="upload-text" style="color:rgba(255,255,255,.5);margin:0;font-size:.85rem">Tap to choose from gallery or files</p>
     <img id="preview-img" alt="Preview"/>
   </div>
-  <input type="file" id="img-input" accept="image/*" capture="environment" style="display:none" onchange="fileSelected(this)"/>
+  <input type="file" id="img-input" accept="image/*" style="display:none" onchange="fileSelected(this)"/>
 
   <div class="mb-3">
     <label class="form-label"><i class="fas fa-road me-1"></i>Road Name / Location</label>

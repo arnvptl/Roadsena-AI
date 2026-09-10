@@ -4,7 +4,7 @@ import os
 
 # ── Load model once when server starts ──────────────────────────────────────
 model = YOLO(
-    r"D:\Pathhole_Detection\YOLOv8_Pothole_Segmentation_Road_Damage_Assessment\model\best.pt"
+    r"C:\Users\arnav\Desktop\Roadsena-AI\YOLOv8_Pothole_Segmentation_Road_Damage_Assessment\model\best.pt"
 )
 
 # ── What the model can detect ────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import os
 
 # Load model ONCE when app starts (saves time)
 model = YOLO(
-    r"D:\Pathhole_Detection\YOLOv8_Pothole_Segmentation_Road_Damage_Assessment\model\best.pt"
+    r"C:\Users\arnav\Desktop\Roadsena-AI\YOLOv8_Pothole_Segmentation_Road_Damage_Assessment\model\best.pt"
 )
 
 model = YOLO(

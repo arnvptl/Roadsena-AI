@@ -215,6 +215,38 @@
 
 /* Pulse */
 @keyframes pulse-ring { 0%{transform:scale(1);opacity:.6} 70%{transform:scale(2.3);opacity:0} 100%{transform:scale(2.3);opacity:0} }
+
+/* ══ MOBILE RESPONSIVE ═══════════════════════ */
+@media (max-width: 768px) {
+  /* City map sidebar: collapse by default on mobile */
+  .map-shell { flex-direction: column; }
+  .sidebar { width: 100% !important; min-width: 0 !important; height: 220px; border-right: none; border-bottom: 1px solid var(--border); transition: height .35s cubic-bezier(.4,0,.2,1); flex-shrink: 0; }
+  .sidebar.collapsed { height: 0 !important; overflow: hidden; }
+  .sb-toggle { top: auto; right: 12px; bottom: -20px; transform: none; width: 44px; height: 20px; border-radius: 0 0 8px 8px; writing-mode: horizontal-tb; border-top: none; border-left: 1px solid var(--border); }
+  .health-ring-wrap { padding: 8px 10px; gap: 8px; }
+  .health-ring { width: 52px; height: 52px; }
+  .road-list { flex: 1; }
+  .view-bar { top: 8px; left: 8px; }
+  .vb-btn { padding: 6px 9px; font-size: .65rem; }
+  .fabs { top: 8px; right: 8px; }
+  .fab { width: 34px; height: 34px; font-size: .75rem; }
+  .status-bar { bottom: 8px; left: 8px; right: 8px; }
+  .kpi-pills { display: none; }
+  .live-pill { font-size: .65rem; }
+  .kpi-grid { gap: 4px; }
+  .kpi .kv { font-size: .9rem; }
+  .kpi .kl { font-size: .55rem; }
+  .map-area { flex: 1; }
+}
+
+@media (max-width: 480px) {
+  .sidebar { height: 180px; }
+  .sb-head { padding: 8px 12px; }
+  .sb-head h5 { font-size: .88rem; }
+  .filter-bar { padding: 7px 10px; }
+  .chips { gap: 2px; }
+  .chip { font-size: .6rem; padding: 2px 7px; }
+}
 </style>
 {% endblock %}
 
@@ -950,7 +982,12 @@ function toggleSidebar(){
   const sb=document.getElementById("sidebar");
   const icon=document.getElementById("sb-icon");
   sb.classList.toggle("collapsed");
-  icon.className=sb.classList.contains("collapsed")?"fas fa-chevron-right":"fas fa-chevron-left";
+  const isMobile=window.innerWidth<=768;
+  if(isMobile){
+    icon.className=sb.classList.contains("collapsed")?"fas fa-chevron-down":"fas fa-chevron-up";
+  } else {
+    icon.className=sb.classList.contains("collapsed")?"fas fa-chevron-right":"fas fa-chevron-left";
+  }
   setTimeout(()=>map.invalidateSize(),360);
 }
 

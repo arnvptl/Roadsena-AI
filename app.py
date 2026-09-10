@@ -1,9 +1,10 @@
 """
 RoadSense AI — Complete Flask Backend
-All routes, AI detection, scoring, PDF, WhatsApp, Email, Chat Agent in one file.
+All routes, AI detection, scoring, PDF, WhatsApp, Email, Chat Agent,
+and Repair Verification System in one file.
 """
 
-import os, json, base64, uuid, time, re, smtplib
+import os, json, base64, uuid, time, re, smtplib, math
 from datetime import datetime
 from io import BytesIO
 from email.mime.multipart import MIMEMultipart
@@ -37,7 +38,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(REPORT_DIR, exist_ok=True)
 
 # ─── Load YOLO Models ────────────────────────────────────────────────────────
-MODEL1_PATH = r"D:\Pathhole_Detection\YOLOv8_Pothole_Segmentation_Road_Damage_Assessment\model\best.pt"
+MODEL1_PATH = os.path.join(BASE_DIR, "YOLOv8_Pothole_Segmentation_Road_Damage_Assessment", "model", "best.pt")
 MODEL2_PATH = None
 
 import torch
@@ -77,6 +78,7 @@ model = model1
 defects_db      = []
 road_records_db = []
 sessions_db     = {}
+video_records_db = []   # stores full per-frame results for video PDF reports
 officers_db     = {
     "admin":   {
         "password": "admin123",
@@ -98,44 +100,6 @@ officers_db     = {
     },
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  ALERT CONFIGURATION — FILL THESE IN
-# ═══════════════════════════════════════════════════════════════════════════════
-#
-#  HOW TO GET FREE GMAIL SMTP:
-#  1. Go to Google Account → Security → Enable 2-Step Verification
-#  2. Go to Google Account → Security → App Passwords
-#  3. Select "Mail" + "Windows Computer" → Generate
-#  4. Copy the 16-character password shown (e.g. "abcd efgh ijkl mnop")
-#  5. Paste it as ALERT_EMAIL_PASSWORD below (no spaces)
-#
-#  HOW TO GET FREE TWILIO WHATSAPP (Sandbox):
-#  1. Go to twilio.com → Sign up (free)
-#  2. Go to Messaging → Try it out → WhatsApp Sandbox
-#  3. Send "join <your-sandbox-word>" to +1 415 523 8886 from officer's WhatsApp
-#  4. Copy Account SID and Auth Token from twilio.com/console
-#
-# ═══════════════════════════════════════════════════════════════════════════════
-
-ALERT_CONFIG = {
-    # ── EMAIL (Gmail SMTP — Free) ──────────────────────────────────────────
-    "email_enabled":   True,
-    "smtp_server":     "smtp.gmail.com",
-    "smtp_port":       587,
-    "sender_email":    os.environ.get("ALERT_EMAIL",    "your_gmail@gmail.com"),
-    "sender_password": os.environ.get("ALERT_PASSWORD", "your_16char_app_password"),
-    "sender_name":     "RoadSense AI Alert System",
-
-    # ── WHATSAPP (Twilio — Free Sandbox) ──────────────────────────────────
-    "whatsapp_enabled": True,
-    "twilio_sid":      os.environ.get("TWILIO_SID",   ""),
-    "twilio_token":    os.environ.get("TWILIO_TOKEN", ""),
-    "twilio_from":     os.environ.get("TWILIO_FROM",  "whatsapp:+14155238886"),
-
-    # ── THRESHOLD ─────────────────────────────────────────────────────────
-    "alert_threshold": 7.0,   # Send alert when score >= this value
-}
-
 # ─── Damage Constants ────────────────────────────────────────────────────────
 DAMAGE_CONFIG = {
     "pothole":            {"base": 5.0, "label": "Pothole",            "repair_cost": 5500},
@@ -155,6 +119,45 @@ SEVERITY_LEVELS = [
     (6, 8,  "Critical",  "danger",  "#dc3545", 30),
     (8, 10, "Emergency", "dark",    "#7b0000", 10),
 ]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ALERT CONFIGURATION — YOUR REAL CREDENTIALS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ALERT_CONFIG = {
+    # ── EMAIL (Gmail SMTP — Free) ──────────────────────────────────────────────
+    "email_enabled":   True,
+    "smtp_server":     "smtp.gmail.com",
+    "smtp_port":       587,
+    "sender_email":    os.environ.get("ALERT_EMAIL",    "arnavp651@gmail.com"),
+    "sender_password": os.environ.get("ALERT_PASSWORD", "dwewmdrlkswztrnu"),
+    "sender_name":     "RoadSense AI Alert System",
+
+    # ── WHATSAPP (Twilio — Free Sandbox) ──────────────────────────────────────
+    "whatsapp_enabled": True,
+    "twilio_sid":      os.environ.get("TWILIO_SID",   ""),
+    "twilio_token":    os.environ.get("TWILIO_TOKEN", ""),
+    "twilio_from":     "whatsapp:+14155238886",
+
+    # ── THRESHOLD ─────────────────────────────────────────────────────────────
+    "alert_threshold": 7.0,
+}
+
+# ─── Officers Database ────────────────────────────────────────────────────────
+officers_db = {
+    "admin": {
+        "password": "admin123",
+        "name":     "Admin Officer",
+        "email":    "onkarkorale7@gmail.com",
+        "phone":    "+919922818898",
+    },
+    "officer1": {
+        "password": "officer123",
+        "name":     "Arnav P (Field Officer)",
+        "email":    "arnavp651@gmail.com",
+        "phone":    "+917972186197",
+    },
+}
 
 # ─── Helper Functions ─────────────────────────────────────────────────────────
 
@@ -395,64 +398,7 @@ def save_record(road_name, lat, lng, detections, score, annotated_bytes, source=
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  ALERT CONFIGURATION — YOUR REAL CREDENTIALS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-ALERT_CONFIG = {
-    # ── EMAIL (Gmail SMTP — Free) ──────────────────────────────────────────────
-    # Sender: your Gmail account (onkarkorale7@gmail.com)
-    # HOW TO GET APP PASSWORD:
-    #   1. Go to myaccount.google.com → Security → Enable 2-Step Verification
-    #   2. Go to myaccount.google.com → Security → App Passwords
-    #   3. Select "Mail" → Generate → copy the 16-char password (no spaces)
-    #   4. Set env var:  set ALERT_PASSWORD=abcdefghijklmnop
-    "email_enabled":   True,
-    "smtp_server":     "smtp.gmail.com",
-    "smtp_port":       587,
-    "sender_email":    os.environ.get("ALERT_EMAIL",    "onkarkorale7@gmail.com"),
-    "sender_password": os.environ.get("ALERT_PASSWORD", "YOUR_16_CHAR_APP_PASSWORD"),
-    "sender_name":     "RoadSense AI Alert System",
-
-    # ── WHATSAPP (Twilio — Free Sandbox) ──────────────────────────────────────
-    # Sender number: +91 99228 18898 (your number — must join Twilio sandbox)
-    # HOW TO SET UP:
-    #   1. Go to twilio.com → Sign up free
-    #   2. Go to Messaging → Try it out → WhatsApp Sandbox
-    #   3. From +91 99228 18898, send "join <sandbox-word>" to +1 415 523 8886
-    #   4. From +91 79721 86197 (officer), ALSO send the same join message
-    #   5. Copy Account SID and Auth Token from twilio.com/console
-    #   6. Set env vars:
-    #        set TWILIO_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    #        set TWILIO_TOKEN=your_auth_token
-    "whatsapp_enabled": True,
-    "twilio_sid":      os.environ.get("TWILIO_SID",   ""),
-    "twilio_token":    os.environ.get("TWILIO_TOKEN", ""),
-    # This is YOUR number — the sender (Twilio sandbox number)
-    "twilio_from":     "whatsapp:+14155238886",  # Twilio sandbox FROM number (always this)
-
-    # ── THRESHOLD ─────────────────────────────────────────────────────────────
-    "alert_threshold": 7.0,   # Send alert when score >= 7.0
-}
-
-# ─── Officers Database — with real contact info ────────────────────────────
-officers_db = {
-    "admin": {
-        "password": "admin123",
-        "name":     "Admin Officer",
-        "email":    "onkarkorale7@gmail.com",      # Your email (system admin)
-        "phone":    "+919922818898",               # Your number
-    },
-    "officer1": {
-        "password": "officer123",
-        "name":     "Arnav P (Field Officer)",
-        "email":    "arnavp651@gmail.com",         # Officer's email
-        "phone":    "+917972186197",               # Officer's WhatsApp number
-    },
-}
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  ALERT SYSTEM — EMAIL + WHATSAPP (complete functions)
+#  ALERT SYSTEM — EMAIL + WHATSAPP
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _build_email_html(record):
@@ -467,7 +413,6 @@ def _build_email_html(record):
     ts     = record.get("timestamp", "")[:19].replace("T", " ")
     source = record.get("source", "").capitalize()
 
-    # Detections rows
     det_rows = ""
     for d in record.get("all_detections", record.get("detections", [])):
         label = d.get("label", d.get("class", "Unknown"))
@@ -500,8 +445,6 @@ def _build_email_html(record):
       <table width="600" cellpadding="0" cellspacing="0"
              style="background:#ffffff;border-radius:12px;overflow:hidden;
                     box-shadow:0 4px 20px rgba(0,0,0,0.1)">
-
-        <!-- HEADER -->
         <tr>
           <td style="background:{alert_color};padding:28px 32px;text-align:center">
             <div style="font-size:36px;margin-bottom:8px">🚨</div>
@@ -513,8 +456,6 @@ def _build_email_html(record):
             </p>
           </td>
         </tr>
-
-        <!-- SCORE BANNER -->
         <tr>
           <td style="background:#1a1a2e;padding:20px 32px;text-align:center">
             <span style="font-size:52px;font-weight:900;color:{alert_color};line-height:1">{score}</span>
@@ -526,66 +467,42 @@ def _build_email_html(record):
             </span>
           </td>
         </tr>
-
-        <!-- ROAD INFO -->
         <tr>
           <td style="padding:28px 32px">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td width="50%" style="vertical-align:top;padding-right:16px">
-                  <p style="margin:0 0 4px;font-size:11px;color:#999;
-                             text-transform:uppercase;letter-spacing:1px">Road Name</p>
+                  <p style="margin:0 0 4px;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">Road Name</p>
                   <p style="margin:0 0 20px;font-size:17px;font-weight:700;color:#1a1a2e">{road}</p>
-
-                  <p style="margin:0 0 4px;font-size:11px;color:#999;
-                             text-transform:uppercase;letter-spacing:1px">Action Required</p>
+                  <p style="margin:0 0 4px;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">Action Required</p>
                   <p style="margin:0 0 20px;font-size:15px;font-weight:700;color:{alert_color}">{action}</p>
-
-                  <p style="margin:0 0 4px;font-size:11px;color:#999;
-                             text-transform:uppercase;letter-spacing:1px">Detected At</p>
+                  <p style="margin:0 0 4px;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">Detected At</p>
                   <p style="margin:0 0 20px;font-size:14px;color:#444">{ts}</p>
                 </td>
-                <td width="50%" style="vertical-align:top;padding-left:16px;
-                                       border-left:1px solid #f0f0f0">
-                  <p style="margin:0 0 4px;font-size:11px;color:#999;
-                             text-transform:uppercase;letter-spacing:1px">Economic Risk (30 days)</p>
-                  <p style="margin:0 0 20px;font-size:17px;font-weight:700;color:#dc3545">
-                    ₹{eco:,}
-                  </p>
-
-                  <p style="margin:0 0 4px;font-size:11px;color:#999;
-                             text-transform:uppercase;letter-spacing:1px">GPS Location</p>
+                <td width="50%" style="vertical-align:top;padding-left:16px;border-left:1px solid #f0f0f0">
+                  <p style="margin:0 0 4px;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">Economic Risk (30 days)</p>
+                  <p style="margin:0 0 20px;font-size:17px;font-weight:700;color:#dc3545">₹{eco:,}</p>
+                  <p style="margin:0 0 4px;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">GPS Location</p>
                   <p style="margin:0 0 20px;font-size:13px;color:#444">{lat:.4f}, {lng:.4f}</p>
-
-                  <p style="margin:0 0 4px;font-size:11px;color:#999;
-                             text-transform:uppercase;letter-spacing:1px">Source</p>
+                  <p style="margin:0 0 4px;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">Source</p>
                   <p style="margin:0;font-size:14px;color:#444">{source} Inspection</p>
                 </td>
               </tr>
             </table>
           </td>
         </tr>
-
-        <!-- DETECTIONS TABLE -->
         <tr>
           <td style="padding:0 32px 24px">
-            <p style="font-size:13px;font-weight:700;color:#1a1a2e;text-transform:uppercase;
-                      letter-spacing:1px;margin:0 0 12px">Defects Detected</p>
-            <table width="100%"
-                   style="border:1px solid #f0f0f0;border-radius:8px;
-                          overflow:hidden;border-collapse:collapse">
+            <p style="font-size:13px;font-weight:700;color:#1a1a2e;text-transform:uppercase;letter-spacing:1px;margin:0 0 12px">Defects Detected</p>
+            <table width="100%" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;border-collapse:collapse">
               <tr style="background:#f8f8f8">
-                <th style="padding:10px 12px;text-align:left;font-size:12px;
-                           color:#666;text-transform:uppercase">Type</th>
-                <th style="padding:10px 12px;text-align:center;font-size:12px;
-                           color:#666;text-transform:uppercase">Count</th>
+                <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666;text-transform:uppercase">Type</th>
+                <th style="padding:10px 12px;text-align:center;font-size:12px;color:#666;text-transform:uppercase">Count</th>
               </tr>
               {det_rows}
             </table>
           </td>
         </tr>
-
-        <!-- BUTTONS -->
         <tr>
           <td style="padding:0 32px 32px;text-align:center">
             <a href="{maps_url}"
@@ -602,11 +519,8 @@ def _build_email_html(record):
             </a>
           </td>
         </tr>
-
-        <!-- FOOTER -->
         <tr>
-          <td style="background:#f8f8f8;padding:16px 32px;text-align:center;
-                     border-top:1px solid #eee">
+          <td style="background:#f8f8f8;padding:16px 32px;text-align:center;border-top:1px solid #eee">
             <p style="margin:0;font-size:11px;color:#999">
               Automated alert from <strong>RoadSense AI</strong> — Road Inspection System<br/>
               Report ID: {record.get('id','')[:8].upper()} &nbsp;|&nbsp;
@@ -614,7 +528,6 @@ def _build_email_html(record):
             </p>
           </td>
         </tr>
-
       </table>
     </td></tr>
   </table>
@@ -623,23 +536,17 @@ def _build_email_html(record):
 
 
 def send_email_alert(record, to_email=None, officer_name="Officer"):
-    """
-    Send HTML email alert.
-    Sender  : onkarkorale7@gmail.com  (needs Gmail App Password)
-    Default recipient: arnavp651@gmail.com  (officer)
-    """
     if not ALERT_CONFIG["email_enabled"]:
         print("[Email] Alerts disabled.")
         return False
 
-    sender   = ALERT_CONFIG["sender_email"]     # onkarkorale7@gmail.com
+    sender   = ALERT_CONFIG["sender_email"]
     password = ALERT_CONFIG["sender_password"]
 
     if "YOUR_16_CHAR" in password:
-        print("[Email] ⚠️  App Password not set. Run:  set ALERT_PASSWORD=your16charpassword")
+        print("[Email] ⚠️  App Password not set.")
         return False
 
-    # Default recipient is the officer (arnavp651@gmail.com)
     recipient = to_email or "arnavp651@gmail.com"
 
     level = record.get("level", "Critical")
@@ -676,7 +583,6 @@ Sent by RoadSense AI from onkarkorale7@gmail.com
     msg.attach(MIMEText(plain_text, "plain"))
     msg.attach(MIMEText(html_body,  "html"))
 
-    # Attach annotated image if it exists on disk
     if record.get("annotated_img"):
         img_path = os.path.join(BASE_DIR, record["annotated_img"].lstrip("/"))
         if os.path.exists(img_path):
@@ -700,7 +606,7 @@ Sent by RoadSense AI from onkarkorale7@gmail.com
         print(f"[Email] ✅ Sent to {recipient}  |  {road} — {score}/10 {level}")
         return True
     except smtplib.SMTPAuthenticationError:
-        print("[Email] ❌ Wrong Gmail App Password. Regenerate at myaccount.google.com → Security → App Passwords")
+        print("[Email] ❌ Wrong Gmail App Password.")
         return False
     except smtplib.SMTPException as e:
         print(f"[Email] ❌ SMTP error: {e}")
@@ -711,16 +617,6 @@ Sent by RoadSense AI from onkarkorale7@gmail.com
 
 
 def send_whatsapp_alert(record, to_number=None):
-    """
-    Send WhatsApp alert via Twilio.
-    FROM (sandbox): +1 415 523 8886  (Twilio sandbox — always this number)
-    TO (officer)  : +91 79721 86197  (arnavp651 / Arnav)
-
-    IMPORTANT — before this works:
-      1. Officer (+91 79721 86197) must WhatsApp "join <word>" to +1 415 523 8886
-      2. Your number (+91 99228 18898) must also join if you want to receive too
-      3. Set TWILIO_SID and TWILIO_TOKEN env vars
-    """
     if not ALERT_CONFIG["whatsapp_enabled"]:
         print("[WhatsApp] Alerts disabled.")
         return False
@@ -730,10 +626,8 @@ def send_whatsapp_alert(record, to_number=None):
 
     if not sid or not token:
         print("[WhatsApp] ⚠️  Twilio SID/Token not set.")
-        print("           Run:  set TWILIO_SID=ACxxxxx  and  set TWILIO_TOKEN=xxxxx")
         return False
 
-    # Default: send to officer's number
     recipient = to_number or "whatsapp:+917972186197"
 
     level  = record.get("level", "Critical")
@@ -778,8 +672,8 @@ def send_whatsapp_alert(record, to_number=None):
         client      = Client(sid, token)
         message_obj = client.messages.create(
             body=message,
-            from_=ALERT_CONFIG["twilio_from"],   # whatsapp:+14155238886
-            to=recipient                          # whatsapp:+917972186197
+            from_=ALERT_CONFIG["twilio_from"],
+            to=recipient
         )
         print(f"[WhatsApp] ✅ Sent to {recipient}  |  SID: {message_obj.sid}")
         return True
@@ -792,20 +686,9 @@ def send_whatsapp_alert(record, to_number=None):
 
 
 def send_all_alerts(record, officer_username=None):
-    """
-    Master alert function.
-    Fires when score >= 7.0
-
-    WHO GETS ALERTED:
-    ─────────────────────────────────────────────────────
-    Email  → arnavp651@gmail.com  (officer, Arnav)
-             onkarkorale7@gmail.com  (you, admin — CC'd via broadcast)
-    WA     → +91 79721 86197  (officer, Arnav)
-    ─────────────────────────────────────────────────────
-    """
     score = record.get("score", 0)
     if score < ALERT_CONFIG["alert_threshold"]:
-        return   # Below threshold — no alert needed
+        return
 
     road  = record.get("road_name", "Unknown")
     level = record.get("level", "Critical")
@@ -815,33 +698,24 @@ def send_all_alerts(record, officer_username=None):
     print(f"[Alert] Sending Email + WhatsApp...")
     print(f"{'='*55}")
 
-    # ── Determine email recipient ──────────────────────────────────────────
     if officer_username and officer_username in officers_db:
-        # Logged-in officer gets the alert
         odata         = officers_db[officer_username]
         officer_email = odata.get("email", "arnavp651@gmail.com")
         officer_phone = odata.get("phone", "+917972186197")
         officer_name  = odata.get("name", "Officer")
 
-        send_email_alert(record,
-                         to_email=officer_email,
-                         officer_name=officer_name)
+        send_email_alert(record, to_email=officer_email, officer_name=officer_name)
 
-        # Also CC admin if the logged-in officer is not admin
         if officer_username != "admin":
             admin_email = officers_db.get("admin", {}).get("email", "")
             if admin_email and admin_email != officer_email:
-                send_email_alert(record,
-                                 to_email=admin_email,
-                                 officer_name="Admin Officer")
+                send_email_alert(record, to_email=admin_email, officer_name="Admin Officer")
 
-        # WhatsApp to officer
         if officer_phone:
             wa_number = f"whatsapp:{officer_phone}" if not officer_phone.startswith("whatsapp:") else officer_phone
             send_whatsapp_alert(record, to_number=wa_number)
 
     else:
-        # No officer logged in (citizen upload) → broadcast to ALL officers
         print("[Alert] No officer session — broadcasting to all officers")
         for uname, odata in officers_db.items():
             email = odata.get("email", "")
@@ -894,6 +768,60 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return wrapper
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  REPAIR VERIFICATION — HELPER FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _gps_distance_meters(lat1, lng1, lat2, lng2):
+    """
+    Haversine formula.
+    Returns the distance in METERS between two GPS coordinates.
+    """
+    R = 6371000  # Earth's radius in metres
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi       = math.radians(lat2 - lat1)
+    dlam       = math.radians(lng2 - lng1)
+    a = (math.sin(dphi / 2) ** 2
+         + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2)
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _gps_verdict(distance_m):
+    """
+    Interprets how close the after-photo is to the original damage point.
+
+    ≤  30 m → Exact match    (same spot)
+    ≤ 100 m → Near           (same road section, acceptable)
+    ≤ 500 m → Far            (different part of road, suspicious)
+    > 500 m → Wrong location (completely different place — REJECT)
+    """
+    if   distance_m <=  30: return "exact", "✅ Same Location Confirmed",        "#10b981"
+    elif distance_m <= 100: return "near",  "📍 Near Original Location",         "#f59e0b"
+    elif distance_m <= 500: return "far",   "⚠️ Different Area — Verify Manually","#f97316"
+    else:                   return "wrong", "❌ Wrong Location — GPS Mismatch",   "#ef4444"
+
+
+def _score_verdict(before, after):
+    """
+    Interprets how much the severity score dropped.
+
+    after ≤ 2.0 AND drop ≥ 70% → Fully Repaired
+    drop ≥ 50%                 → Mostly Repaired
+    drop ≥ 25%                 → Partially Repaired
+    drop ≥ 0%                  → Minimal work done
+    drop < 0%  (score rose)    → Road has worsened
+    """
+    drop     = before - after
+    drop_pct = round((drop / before * 100) if before > 0 else 0)
+
+    if   after <= 2.0 and drop_pct >= 70: return "FULLY_REPAIRED",     "✅ Fully Repaired",      "#10b981", drop_pct
+    elif drop_pct >= 50:                  return "MOSTLY_REPAIRED",    "🟡 Mostly Repaired",     "#f59e0b", drop_pct
+    elif drop_pct >= 25:                  return "PARTIALLY_REPAIRED", "🟠 Partially Repaired",  "#f97316", drop_pct
+    elif drop_pct >= 0:                   return "MINIMAL_REPAIR",     "🔴 Minimal Work Done",   "#ef4444", drop_pct
+    else:                                 return "WORSENED",           "⛔ Road Has Worsened",   "#7b0000", drop_pct
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ROUTES — Pages
@@ -966,6 +894,15 @@ def predictive_page():
 @login_required
 def monsoon_page():
     return render_template("monsoon.html", officer=session.get("name"))
+
+@app.route("/verify")
+def verify_page():
+    """
+    Public page — no login required.
+    Both officers AND citizens can submit verification photos.
+    """
+    return render_template("verify.html")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  API ROUTES
@@ -1079,14 +1016,11 @@ def api_stop_session():
     if sess_id not in sessions_db:
         return jsonify({"error": "Session not found"}), 404
 
-    # Grab officer username before finalise deletes session
     officer_username = sessions_db[sess_id].get("officer_username", "")
-
     record = finalise_session(sess_id)
     if not record:
         return jsonify({"error": "Could not finalise session"}), 500
 
-    # Send alerts if threshold met
     send_all_alerts(record, officer_username=officer_username)
 
     return jsonify({
@@ -1154,9 +1088,6 @@ def api_upload_image():
     score, scored_dets = calc_score(raw_dets, w, h)
     annotated          = annotate_image(image_bytes, scored_dets)
     record             = save_record(road_name, lat, lng, scored_dets, score, annotated, "citizen")
-
-    # Alert — citizen uploads don't have a logged-in officer,
-    # so broadcast to all officers
     send_all_alerts(record, officer_username=None)
 
     return jsonify({
@@ -1171,51 +1102,406 @@ def api_upload_image():
         "repair_action": record["repair_action"],
     })
 
+def _stamp_clear_frame(image_bytes):
+    """
+    Adds a green "✓ CLEAR" banner to a frame with no defects,
+    so every frame in the PDF has a consistent visual stamp.
+    """
+    np_arr = np.frombuffer(image_bytes, np.uint8)
+    img    = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return image_bytes
+    h, w = img.shape[:2]
+    # Green banner across top
+    cv2.rectangle(img, (0, 0), (w, 38), (34, 197, 94), -1)
+    cv2.putText(img, "  CLEAR — No Defects Detected", (8, 26),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.72, (255, 255, 255), 2)
+    _, buf = cv2.imencode(".jpg", img)
+    return buf.tobytes()
+
+
 @app.route("/api/process-video", methods=["POST"])
 @login_required
 def api_process_video():
-    road_name = request.form.get("road_name", "Unknown Road")
-    lat       = float(request.form.get("lat",  17.6868))
-    lng       = float(request.form.get("lng",  75.9079))
-    f         = request.files.get("video")
+    """
+    Processes a dashcam video at exactly 2-second intervals.
+    — Saves an annotated image for EVERY sampled frame (defect or clear)
+    — Counts exact potholes and cracks per frame
+    — Stores all frame data in video_records_db for PDF export
+    """
+    road_name        = request.form.get("road_name", "Unknown Road")
+    lat              = float(request.form.get("lat",  17.6868))
+    lng              = float(request.form.get("lng",  75.9079))
+    f                = request.files.get("video")
+    officer_username = session.get("officer", "")
+
     if not f:
         return jsonify({"error": "No video file"}), 400
+
     tmp_path = os.path.join(OUTPUT_DIR, f"tmp_{uuid.uuid4().hex}.mp4")
     f.save(tmp_path)
-    cap      = cv2.VideoCapture(tmp_path)
-    fps      = cap.get(cv2.CAP_PROP_FPS) or 30
-    interval = int(fps * 2)
-    frame_num = 0
-    processed = 0
-    results   = []
-    officer_username = session.get("officer", "")
+
+    cap          = cv2.VideoCapture(tmp_path)
+    fps          = cap.get(cv2.CAP_PROP_FPS) or 30
+    interval     = max(1, int(fps * 2))   # sample every 2 seconds
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration_sec = round(total_frames / fps, 1) if fps else 0
+
+    frame_num   = 0
+    frames_data = []   # one entry per sampled frame
+    worst_record = None
+
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
+
             if frame_num % interval == 0:
-                _, buf         = cv2.imencode(".jpg", frame)
-                image_bytes    = buf.tobytes()
+                ts_sec = round(frame_num / fps, 1) if fps else 0
+
+                _, buf      = cv2.imencode(".jpg", frame)
+                image_bytes = buf.tobytes()
+
                 raw_dets, w, h = run_yolo(image_bytes)
+
                 if raw_dets:
                     score, scored_dets = calc_score(raw_dets, w, h)
                     annotated          = annotate_image(image_bytes, scored_dets)
-                    record             = save_record(road_name, lat, lng, scored_dets,
-                                                     score, annotated, "video")
+                    img_url            = _save_image(annotated)
+
+                    # ── per-type counts for this frame ──────────────────────
+                    frame_type_counts = {}
+                    for d in scored_dets:
+                        lbl = d.get("label", d.get("class", "Unknown"))
+                        frame_type_counts[lbl] = frame_type_counts.get(lbl, 0) + 1
+
+                    frame_info = {
+                        "frame_num":        frame_num,
+                        "timestamp_sec":    ts_sec,
+                        "timestamp_label":  f"{int(ts_sec//60):02d}:{int(ts_sec%60):02d}",
+                        "score":            score,
+                        "level":            get_level(score)[0],
+                        "color":            get_level(score)[2],
+                        "detections":       scored_dets,
+                        "type_counts":      frame_type_counts,
+                        "pothole_count":    frame_type_counts.get("Pothole", 0),
+                        "img_url":          img_url,
+                        "has_defects":      True,
+                    }
+
+                    # Save the worst frame as the main road record
+                    record = save_record(road_name, lat, lng, scored_dets,
+                                         score, annotated, "video")
+                    if worst_record is None or score > worst_record["score"]:
+                        worst_record = record
                     send_all_alerts(record, officer_username=officer_username)
-                    results.append({"frame": frame_num, "score": score, "level": record["level"]})
-                processed += 1
+
+                else:
+                    # No defects — stamp frame and save it too
+                    stamped  = _stamp_clear_frame(image_bytes)
+                    img_url  = _save_image(stamped)
+                    frame_info = {
+                        "frame_num":       frame_num,
+                        "timestamp_sec":   ts_sec,
+                        "timestamp_label": f"{int(ts_sec//60):02d}:{int(ts_sec%60):02d}",
+                        "score":           0.0,
+                        "level":           "Good",
+                        "color":           "#28a745",
+                        "detections":      [],
+                        "type_counts":     {},
+                        "pothole_count":   0,
+                        "img_url":         img_url,
+                        "has_defects":     False,
+                    }
+
+                frames_data.append(frame_info)
+
             frame_num += 1
     finally:
         cap.release()
         os.remove(tmp_path)
+
+    # ── Aggregate stats ───────────────────────────────────────────────────────
+    defect_frames = [fr for fr in frames_data if fr["has_defects"]]
+
+    # Total detections summed across all frames (may include repeated sightings)
+    total_type_counts = {}
+    for fr in defect_frames:
+        for lbl, cnt in fr["type_counts"].items():
+            total_type_counts[lbl] = total_type_counts.get(lbl, 0) + cnt
+
+    # Most reliable unique-pothole estimate: peak count in ANY single frame
+    # (a pothole visible in 3 consecutive frames is still 1 pothole)
+    unique_potholes = max((fr["pothole_count"] for fr in defect_frames), default=0)
+
+    # ── Store video record for PDF ────────────────────────────────────────────
+    video_id = uuid.uuid4().hex
+    video_record = {
+        "id":               video_id,
+        "road_name":        road_name,
+        "lat":              lat,
+        "lng":              lng,
+        "timestamp":        datetime.now().isoformat(),
+        "duration_sec":     duration_sec,
+        "total_frames":     total_frames,
+        "frames_analyzed":  len(frames_data),
+        "defect_frame_count": len(defect_frames),
+        "frames_data":      frames_data,
+        "total_type_counts": [{"label": k, "count": v}
+                               for k, v in sorted(total_type_counts.items(),
+                                                   key=lambda x: -x[1])],
+        "unique_potholes":  unique_potholes,
+        "officer":          session.get("name", ""),
+        "worst_score":      worst_record["score"] if worst_record else 0,
+        "worst_level":      worst_record["level"] if worst_record else "Good",
+    }
+    video_records_db.append(video_record)
+
     return jsonify({
-        "frames_analyzed": processed,
-        "defects_found":   len(results),
-        "results":         results,
-        "city_health":     get_city_health_score(),
+        "frames_analyzed":  len(frames_data),
+        "defects_found":    len(defect_frames),
+        "unique_potholes":  unique_potholes,
+        "total_type_counts": video_record["total_type_counts"],
+        "results":          [
+            {
+                "frame":       fr["frame_num"],
+                "timestamp":   fr["timestamp_label"],
+                "score":       fr["score"],
+                "level":       fr["level"],
+                "color":       fr["color"],
+                "type_counts": fr["type_counts"],
+                "img_url":     fr["img_url"],
+                "has_defects": fr["has_defects"],
+            }
+            for fr in frames_data
+        ],
+        "city_health": get_city_health_score(),
+        "video_id":    video_id,
+        "duration_sec": duration_sec,
     })
+
+
+# ─── Repair Verification API Routes ──────────────────────────────────────────
+
+@app.route("/api/verify-repair", methods=["POST"])
+def api_verify_repair():
+    """
+    COMPLETE VERIFICATION LOGIC — 7 Steps:
+    1. Accept after-photo + GPS from browser
+    2. Find the original damage record (by Record ID or GPS proximity)
+    3. Run YOLO on the after-photo → get new score
+    4. GPS verdict  → same location check
+    5. Score verdict → repair quality check
+    6. Overall verdict (requires BOTH GPS match + score drop)
+    7. Build 5-point evidence chain
+    8. Update DB record status
+    """
+
+    # ── Inputs ───────────────────────────────────────────────────────────────
+    upload_lat = float(request.form.get("lat",  0))
+    upload_lng = float(request.form.get("lng",  0))
+    record_id  = request.form.get("record_id",   "").strip()
+    verifier   = request.form.get("verifier_name","Anonymous Citizen").strip()
+    f          = request.files.get("image")
+
+    if not f:
+        return jsonify({"error": "No image uploaded"}), 400
+
+    # ── Step 1: Find original damage record ──────────────────────────────────
+    original     = None
+    gps_distance = 9999
+
+    if record_id:
+        original = next(
+            (r for r in road_records_db if r["id"] == record_id or
+             r["id"][:8].upper() == record_id.upper()[:8]),
+            None
+        )
+        if original:
+            gps_distance = _gps_distance_meters(
+                upload_lat, upload_lng,
+                original["lat"], original["lng"]
+            )
+
+    if not original and upload_lat and upload_lng:
+        best_match = None
+        best_dist  = 9999999
+        for r in road_records_db:
+            if r.get("overall_verdict") == "VERIFIED_FIXED":
+                continue
+            if not r.get("lat") or not r.get("lng"):
+                continue
+            dist = _gps_distance_meters(
+                upload_lat, upload_lng,
+                r["lat"], r["lng"]
+            )
+            if dist < best_dist:
+                best_dist  = dist
+                best_match = r
+        if best_match and best_dist <= 500:
+            original     = best_match
+            gps_distance = best_dist
+
+    # ── Step 2: Run YOLO on after-photo ──────────────────────────────────────
+    image_bytes       = f.read()
+    raw_dets, w, h    = run_yolo(image_bytes)
+    new_score, scored = calc_score(raw_dets, w, h)
+    annotated         = annotate_image(image_bytes, scored)
+    after_img_url     = _save_image(annotated)
+
+    # ── Step 3: GPS verdict ───────────────────────────────────────────────────
+    gps_key, gps_label, gps_color = _gps_verdict(gps_distance)
+
+    # ── Step 4: Score verdict ─────────────────────────────────────────────────
+    before_score = original["score"] if original else 10.0
+    before_level = original["level"] if original else "Unknown"
+    score_key, score_label, score_color, drop_pct = _score_verdict(before_score, new_score)
+
+    # ── Step 5: Overall verdict ───────────────────────────────────────────────
+    if gps_key in ("exact", "near") and score_key in ("FULLY_REPAIRED", "MOSTLY_REPAIRED"):
+        overall_verdict    = "VERIFIED_FIXED"
+        overall_label      = "✅ REPAIR VERIFIED BY AI"
+        overall_color      = "#10b981"
+        overall_bg         = "rgba(16,185,129,0.1)"
+        city_health_change = +8
+
+    elif gps_key == "wrong":
+        overall_verdict    = "LOCATION_MISMATCH"
+        overall_label      = "❌ LOCATION MISMATCH — Cannot Verify"
+        overall_color      = "#ef4444"
+        overall_bg         = "rgba(239,68,68,0.1)"
+        city_health_change = 0
+
+    elif score_key in ("MINIMAL_REPAIR", "WORSENED"):
+        overall_verdict    = "NOT_REPAIRED"
+        overall_label      = "🔴 ROAD NOT REPAIRED"
+        overall_color      = "#ef4444"
+        overall_bg         = "rgba(239,68,68,0.1)"
+        city_health_change = 0
+
+    else:
+        overall_verdict    = "PARTIAL_REPAIR"
+        overall_label      = "🟡 PARTIALLY REPAIRED — More Work Needed"
+        overall_color      = "#f59e0b"
+        overall_bg         = "rgba(245,158,11,0.1)"
+        city_health_change = +3
+
+    # ── Step 6: Build 5-point evidence chain ──────────────────────────────────
+    evidence = [
+        {
+            "point":  "GPS Location Match",
+            "result": f"Photo taken {round(gps_distance)}m from original damage site",
+            "detail": gps_label,
+            "color":  gps_color,
+            "passed": gps_key in ("exact", "near")
+        },
+        {
+            "point":  "AI Score Comparison",
+            "result": f"{before_score} → {new_score}  ({drop_pct}% improvement)",
+            "detail": score_label,
+            "color":  score_color,
+            "passed": score_key in ("FULLY_REPAIRED", "MOSTLY_REPAIRED")
+        },
+        {
+            "point":  "Remaining Defect Detection",
+            "result": f"{len(raw_dets)} defect(s) still visible" if raw_dets else "Zero defects detected — road clear",
+            "detail": "YOLO AI scanned after-photo for any remaining road damage",
+            "color":  "#10b981" if not raw_dets else "#f59e0b",
+            "passed": len(raw_dets) == 0
+        },
+        {
+            "point":  "Timestamp Verification",
+            "result": f"Verified: {datetime.now().strftime('%d %b %Y %H:%M')}",
+            "detail": f"Original damage reported: {original['timestamp'][:10] if original else 'Unknown'}",
+            "color":  "#3b82f6",
+            "passed": True
+        },
+        {
+            "point":  "Road Record Identity",
+            "result": original["road_name"] if original else "No matching record found",
+            "detail": f"Record ID: {original['id'][:8].upper() if original else 'Not found'}  |  Source: {original.get('source','').capitalize() if original else '—'}",
+            "color":  "#3b82f6" if original else "#ef4444",
+            "passed": original is not None
+        }
+    ]
+
+    passed_count = sum(1 for e in evidence if e["passed"])
+    confidence   = round((passed_count / len(evidence)) * 100)
+
+    # ── Step 7: Update DB record ──────────────────────────────────────────────
+    verified_at = datetime.now().isoformat()
+    if original:
+        original["status"]          = "verified_fixed" if overall_verdict == "VERIFIED_FIXED" else "verification_failed"
+        original["verified_at"]     = verified_at
+        original["after_score"]     = new_score
+        original["after_img"]       = after_img_url
+        original["overall_verdict"] = overall_verdict
+        original["score_drop_pct"]  = drop_pct
+        original["gps_distance_m"]  = round(gps_distance, 1)
+        original["verifier"]        = verifier
+
+    # ── Response ──────────────────────────────────────────────────────────────
+    return jsonify({
+        "overall_verdict":    overall_verdict,
+        "overall_label":      overall_label,
+        "overall_color":      overall_color,
+        "overall_bg":         overall_bg,
+        "confidence":         confidence,
+        "passed_checks":      passed_count,
+        "total_checks":       len(evidence),
+        "gps_distance_m":     round(gps_distance, 1),
+        "gps_verdict":        gps_key,
+        "gps_label":          gps_label,
+        "gps_color":          gps_color,
+        "before_score":       before_score,
+        "after_score":        new_score,
+        "before_level":       before_level,
+        "after_level":        get_level(new_score)[0],
+        "before_color":       get_level(before_score)[2] if original else "#ef4444",
+        "after_color":        get_level(new_score)[2],
+        "score_drop_pct":     drop_pct,
+        "score_verdict":      score_key,
+        "before_img":         (original.get("annotated_img") or original.get("worst_img")) if original else None,
+        "after_img":          after_img_url,
+        "evidence":           evidence,
+        "road_name":          original["road_name"] if original else "Unknown",
+        "original_lat":       original["lat"] if original else upload_lat,
+        "original_lng":       original["lng"] if original else upload_lng,
+        "record_id":          original["id"] if original else None,
+        "verified_at":        datetime.now().strftime("%d %b %Y, %H:%M:%S"),
+        "verifier":           verifier,
+        "city_health_change": city_health_change,
+        "remaining_defects":  [
+            {"label": d.get("label", d.get("class", "")), "score": d.get("single_score", 0)}
+            for d in scored
+        ],
+    })
+
+
+@app.route("/api/verification-history")
+@login_required
+def api_verification_history():
+    """All records that have been through the verification process."""
+    verified = [r for r in road_records_db if r.get("verified_at")]
+    result   = []
+    for r in verified:
+        result.append({
+            "id":           r["id"],
+            "road_name":    r["road_name"],
+            "before_score": r["score"],
+            "after_score":  r.get("after_score", 0),
+            "drop_pct":     r.get("score_drop_pct", 0),
+            "verdict":      r.get("overall_verdict", ""),
+            "gps_distance": r.get("gps_distance_m", 0),
+            "verified_at":  r.get("verified_at", ""),
+            "verifier":     r.get("verifier", ""),
+            "before_img":   r.get("annotated_img"),
+            "after_img":    r.get("after_img"),
+        })
+    result.sort(key=lambda x: x["verified_at"], reverse=True)
+    return jsonify(result)
+
 
 # ─── PDF Report ───────────────────────────────────────────────────────────────
 @app.route("/api/report/<record_id>")
@@ -1297,6 +1583,199 @@ def _generate_pdf(record, pdf_path):
     story.append(Paragraph(
         f"Generated by RoadSense AI | {datetime.now().strftime('%d %b %Y %H:%M')} | "
         f"Report ID: {record['id'][:8].upper()}", footer_style))
+    doc.build(story)
+
+
+# ─── Video PDF Report ─────────────────────────────────────────────────────────
+
+@app.route("/api/video-report/<video_id>")
+@login_required
+def api_video_report(video_id):
+    """Download a full frame-by-frame PDF report for a processed video."""
+    vr = next((r for r in video_records_db if r["id"] == video_id), None)
+    if not vr:
+        return "Video record not found", 404
+    pdf_path = os.path.join(REPORT_DIR, f"video_report_{video_id}.pdf")
+    _generate_video_pdf(vr, pdf_path)
+    safe_name = vr["road_name"].replace(" ", "_")
+    return send_file(pdf_path, as_attachment=True,
+                     download_name=f"RoadSense_Video_{safe_name}.pdf")
+
+
+def _generate_video_pdf(vr, pdf_path):
+    """
+    Full per-frame PDF for a video inspection.
+    Layout:
+      Page 1 — Cover: summary stats + defect type table
+      Page 2+ — Frame grid: 2 frames per row, every sampled frame
+                 Each cell shows: annotated image, timestamp, score, detection list
+    """
+    from reportlab.platypus import KeepTogether
+
+    doc = SimpleDocTemplate(
+        pdf_path, pagesize=A4,
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=1.8*cm,  bottomMargin=1.8*cm,
+    )
+
+    # ── Styles ────────────────────────────────────────────────────────────────
+    title_s = ParagraphStyle("vt", fontSize=22, fontName="Helvetica-Bold",
+                              textColor=colors.HexColor("#1a1a2e"), alignment=TA_CENTER, spaceAfter=4)
+    sub_s   = ParagraphStyle("vs", fontSize=10, fontName="Helvetica",
+                              textColor=colors.HexColor("#666"), alignment=TA_CENTER, spaceAfter=18)
+    head_s  = ParagraphStyle("vh", fontSize=12, fontName="Helvetica-Bold",
+                              textColor=colors.HexColor("#1a1a2e"), spaceBefore=14, spaceAfter=6)
+    foot_s  = ParagraphStyle("vf", fontSize=7.5, textColor=colors.HexColor("#aaa"), alignment=TA_CENTER)
+    cell_s  = ParagraphStyle("vc", fontSize=7, fontName="Helvetica",
+                              textColor=colors.HexColor("#333"), leading=10)
+    cell_b  = ParagraphStyle("vcb", fontSize=7.5, fontName="Helvetica-Bold",
+                              textColor=colors.HexColor("#1a1a2e"), leading=11)
+
+    story = []
+
+    # ─── COVER PAGE ───────────────────────────────────────────────────────────
+    story.append(Paragraph("🛣  RoadSense AI", title_s))
+    story.append(Paragraph("Video Inspection Report — Frame-by-Frame Analysis", sub_s))
+    story.append(Spacer(1, 0.3*cm))
+
+    ts  = vr["timestamp"][:19].replace("T", " ")
+    dur = f"{int(vr['duration_sec']//60)}m {int(vr['duration_sec']%60)}s"
+    meta = [
+        ["Road Name",         vr["road_name"],            "Inspection Date", ts],
+        ["GPS Coordinates",   f"{vr['lat']:.4f}, {vr['lng']:.4f}",
+         "Video Duration",    dur],
+        ["Officer",           vr.get("officer","—"),
+         "Frames Analyzed",   str(vr["frames_analyzed"])],
+        ["Defect Frames",     str(vr["defect_frame_count"]),
+         "Clear Frames",      str(vr["frames_analyzed"] - vr["defect_frame_count"])],
+        ["Unique Potholes",   str(vr["unique_potholes"]),
+         "Worst Score",       f"{vr['worst_score']}/10  ({vr['worst_level']})"],
+    ]
+    mt = Table(meta, colWidths=[3.8*cm, 5.5*cm, 3.8*cm, 4.4*cm])
+    mt.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (0,-1), colors.HexColor("#dbeafe")),
+        ("BACKGROUND", (2,0), (2,-1), colors.HexColor("#dbeafe")),
+        ("FONTNAME",   (0,0), (-1,-1), "Helvetica"),
+        ("FONTNAME",   (0,0), (0,-1),  "Helvetica-Bold"),
+        ("FONTNAME",   (2,0), (2,-1),  "Helvetica-Bold"),
+        ("FONTSIZE",   (0,0), (-1,-1), 8.5),
+        ("GRID",       (0,0), (-1,-1), 0.4, colors.HexColor("#c7d2fe")),
+        ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
+        ("PADDING",    (0,0), (-1,-1), 6),
+    ]))
+    story.append(mt)
+    story.append(Spacer(1, 0.5*cm))
+
+    # Defect type summary table
+    if vr["total_type_counts"]:
+        story.append(Paragraph("Defect Type Summary (cumulative across all frames)", head_s))
+        type_data = [["Defect Type", "Occurrences Across Frames", "Note"]]
+        for row in vr["total_type_counts"]:
+            note = ("⚠ Same defect may appear in consecutive frames" 
+                    if row["count"] > 3 else "—")
+            type_data.append([row["label"], str(row["count"]), note])
+
+        # Unique potholes note row
+        type_data.append([
+            "UNIQUE POTHOLES (estimated)",
+            str(vr["unique_potholes"]),
+            "Peak count in any single frame"
+        ])
+
+        tt = Table(type_data, colWidths=[5*cm, 5*cm, 7.5*cm])
+        tt.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,0), colors.HexColor("#1a1a2e")),
+            ("TEXTCOLOR",     (0,0), (-1,0), colors.white),
+            ("FONTNAME",      (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTNAME",      (0,-1),(0,-1), "Helvetica-Bold"),
+            ("BACKGROUND",    (0,-1),(-1,-1), colors.HexColor("#fef3c7")),
+            ("FONTSIZE",       (0,0), (-1,-1), 8.5),
+            ("GRID",           (0,0), (-1,-1), 0.4, colors.HexColor("#cccccc")),
+            ("ROWBACKGROUNDS", (0,1), (-1,-2),
+             [colors.white, colors.HexColor("#f8fafc")]),
+            ("VALIGN",         (0,0), (-1,-1), "MIDDLE"),
+            ("PADDING",        (0,0), (-1,-1), 6),
+        ]))
+        story.append(tt)
+
+    story.append(Spacer(1, 0.6*cm))
+    story.append(Paragraph(
+        f"Report ID: {vr['id'][:8].upper()}  |  "
+        f"Generated: {datetime.now().strftime('%d %b %Y %H:%M')}  |  RoadSense AI",
+        foot_s))
+
+    # ─── FRAME PAGES ─────────────────────────────────────────────────────────
+    story.append(Paragraph("Frame-by-Frame Analysis", head_s))
+    story.append(Paragraph(
+        "Every frame sampled at 2-second intervals is shown below. "
+        "Defect frames carry YOLO bounding box annotations; clear frames carry a green stamp.",
+        ParagraphStyle("note", fontSize=7.5, textColor=colors.HexColor("#666"), spaceAfter=8)
+    ))
+
+    IMG_W  = 8.5*cm
+    IMG_H  = 5.0*cm
+    frames = vr["frames_data"]
+
+    # Build pairs for 2-per-row layout
+    for i in range(0, len(frames), 2):
+        pair = frames[i:i+2]
+        row_cells = []
+
+        for fr in pair:
+            # Image
+            img_elem = None
+            if fr.get("img_url"):
+                disk = os.path.join(BASE_DIR, fr["img_url"].lstrip("/"))
+                if os.path.exists(disk):
+                    img_elem = RLImage(disk, width=IMG_W, height=IMG_H)
+
+            if img_elem is None:
+                img_elem = Paragraph("(image not found)", cell_s)
+
+            # Detection lines
+            if fr["has_defects"]:
+                det_lines = []
+                for lbl, cnt in fr["type_counts"].items():
+                    det_lines.append(f"• {lbl}: {cnt}")
+                det_text = "\n".join(det_lines) if det_lines else "—"
+                score_color = fr["color"].lstrip("#")
+                header_color = colors.HexColor("#" + score_color)
+            else:
+                det_text     = "No defects detected"
+                header_color = colors.HexColor("#22c55e")
+
+            header = Paragraph(
+                f"Frame {fr['frame_num']}  ·  ⏱ {fr['timestamp_label']}  "
+                f"·  Score: {fr['score']}/10  [{fr['level']}]",
+                ParagraphStyle("fh", fontSize=7, fontName="Helvetica-Bold",
+                               textColor=colors.white, backColor=header_color,
+                               leading=12, leftIndent=3, rightIndent=3,
+                               spaceBefore=0, spaceAfter=0)
+            )
+            det_para = Paragraph(det_text, cell_s)
+
+            cell_content = Table(
+                [[header], [img_elem], [det_para]],
+                colWidths=[IMG_W]
+            )
+            cell_content.setStyle(TableStyle([
+                ("BOX",     (0,0), (-1,-1), 0.5, colors.HexColor("#d1d5db")),
+                ("PADDING", (0,0), (-1,-1), 2),
+                ("VALIGN",  (0,0), (-1,-1), "TOP"),
+            ]))
+            row_cells.append(cell_content)
+
+        # Pad to 2 columns if last row has only 1 frame
+        if len(row_cells) == 1:
+            row_cells.append(Paragraph("", cell_s))
+
+        row_table = Table([row_cells], colWidths=[IMG_W + 0.4*cm, IMG_W + 0.4*cm])
+        row_table.setStyle(TableStyle([
+            ("VALIGN",  (0,0), (-1,-1), "TOP"),
+            ("PADDING", (0,0), (-1,-1), 4),
+        ]))
+        story.append(KeepTogether([row_table, Spacer(1, 0.15*cm)]))
+
     doc.build(story)
 
 # ─── Budget Optimizer ─────────────────────────────────────────────────────────
@@ -1428,6 +1907,7 @@ def api_add_demo():
 def api_reset():
     defects_db.clear()
     road_records_db.clear()
+    video_records_db.clear()
     return jsonify({"ok": True})
 
 
@@ -1472,7 +1952,6 @@ def _predict_deterioration(record):
     p90 = round(min(10.0, current * rate**3), 2)
     days_to_emergency = None
     if current < 8 and rate > 1.0:
-        import math
         try: days_to_emergency = round((math.log(8/current)/math.log(rate))*30)
         except Exception: pass
     return {"current": current, "in_30_days": p30, "level_30": _lv(p30),
@@ -1585,12 +2064,6 @@ def api_zone_intelligence():
 @app.route("/api/test-alerts", methods=["POST"])
 @login_required
 def api_test_alerts():
-    """
-    Test endpoint — sends a fake alert so you can verify
-    email and WhatsApp are configured correctly before demo.
-    Hit this from Postman or the browser console:
-    fetch('/api/test-alerts', {method:'POST'})
-    """
     fake_record = {
         "id":             "TEST0001",
         "road_name":      "TEST — MG Road Demo",
@@ -1623,5 +2096,6 @@ if __name__ == "__main__":
     print("  Dashboard : http://localhost:5000/dashboard")
     print("  City Map  : http://localhost:5000/city-map")
     print("  Citizen   : http://localhost:5000/report")
+    print("  Verify    : http://localhost:5000/verify")
     print("=" * 60)
     app.run(debug=True, host="0.0.0.0", port=5000)
