@@ -1,5 +1,5 @@
 """
-RoadSense AI — Complete Flask Backend
+NagarDrishti — Complete Flask Backend
 All routes, AI detection, scoring, PDF, WhatsApp, Email, Chat Agent,
 and Repair Verification System in one file.
 """
@@ -28,7 +28,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 # ─── App Setup ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
-app.secret_key = "roadsense_secret_2024"
+app.secret_key = "NagarDrishti_secret_2024"
 
 # Folders
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -52,7 +52,7 @@ def _patch_pytorch_26():
         torch.serialization.add_safe_globals([
             DetectionModel, SegmentationModel, PoseModel, ClassificationModel
         ])
-        print("[RoadSense] PyTorch 2.6 safe-globals patch applied ✓")
+        print("[NagarDrishti] PyTorch 2.6 safe-globals patch applied ✓")
     except AttributeError:
         pass
     except ImportError:
@@ -60,17 +60,17 @@ def _patch_pytorch_26():
 
 _patch_pytorch_26()
 
-print(f"[RoadSense] Loading Model 1 (Pothole) ...")
+print(f"[NagarDrishti] Loading Model 1 (Pothole) ...")
 model1 = YOLO(MODEL1_PATH)
-print(f"[RoadSense] Model 1 loaded ✓  classes: {list(model1.names.values())}")
+print(f"[NagarDrishti] Model 1 loaded ✓  classes: {list(model1.names.values())}")
 
 model2 = None
 if MODEL2_PATH and os.path.exists(MODEL2_PATH):
-    print(f"[RoadSense] Loading Model 2 (Crack) ...")
+    print(f"[NagarDrishti] Loading Model 2 (Crack) ...")
     model2 = YOLO(MODEL2_PATH)
-    print(f"[RoadSense] Model 2 loaded ✓  classes: {list(model2.names.values())}")
+    print(f"[NagarDrishti] Model 2 loaded ✓  classes: {list(model2.names.values())}")
 else:
-    print("[RoadSense] Model 2 not configured — single-model mode")
+    print("[NagarDrishti] Model 2 not configured — single-model mode")
 
 model = model1
 
@@ -131,7 +131,7 @@ ALERT_CONFIG = {
     "smtp_port":       587,
     "sender_email":    os.environ.get("ALERT_EMAIL",    "arnavp651@gmail.com"),
     "sender_password": os.environ.get("ALERT_PASSWORD", "dwewmdrlkswztrnu"),
-    "sender_name":     "RoadSense AI Alert System",
+    "sender_name":     "NagarDrishti Alert System",
 
     # ── WHATSAPP (Twilio — Free Sandbox) ──────────────────────────────────────
     "whatsapp_enabled": True,
@@ -452,7 +452,7 @@ def _build_email_html(record):
               ROAD DAMAGE ALERT
             </h1>
             <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px">
-              RoadSense AI — Automated Detection System
+              NagarDrishti — Automated Detection System
             </p>
           </td>
         </tr>
@@ -522,7 +522,7 @@ def _build_email_html(record):
         <tr>
           <td style="background:#f8f8f8;padding:16px 32px;text-align:center;border-top:1px solid #eee">
             <p style="margin:0;font-size:11px;color:#999">
-              Automated alert from <strong>RoadSense AI</strong> — Road Inspection System<br/>
+              Automated alert from <strong>NagarDrishti</strong> — Road Inspection System<br/>
               Report ID: {record.get('id','')[:8].upper()} &nbsp;|&nbsp;
               Sender: onkarkorale7@gmail.com
             </p>
@@ -557,12 +557,12 @@ def send_email_alert(record, to_email=None, officer_name="Officer"):
     lng   = record.get("lng", 0)
 
     msg            = MIMEMultipart("alternative")
-    msg["Subject"] = f"🚨 RoadSense ALERT — {level} Damage on {road} ({score}/10)"
-    msg["From"]    = f"RoadSense AI <{sender}>"
+    msg["Subject"] = f"🚨 NagarDrishti ALERT — {level} Damage on {road} ({score}/10)"
+    msg["From"]    = f"NagarDrishti <{sender}>"
     msg["To"]      = recipient
 
     plain_text = f"""
-ROADSENSE AI — ROAD DAMAGE ALERT
+NagarDrishti — ROAD DAMAGE ALERT
 ==================================
 Road      : {road}
 Score     : {score}/10 — {level}
@@ -576,7 +576,7 @@ Report ID : {record.get('id','')[:8].upper()}
 Maps Link : https://www.google.com/maps?q={lat},{lng}
 Dashboard : http://localhost:5000/city-map
 ==================================
-Sent by RoadSense AI from onkarkorale7@gmail.com
+Sent by NagarDrishti from onkarkorale7@gmail.com
 """
     html_body = _build_email_html(record)
 
@@ -654,7 +654,7 @@ def send_whatsapp_alert(record, to_number=None):
         det_lines = "  • Road damage detected\n"
 
     message = (
-        f"{emoji} *RoadSense AI — ROAD ALERT*\n\n"
+        f"{emoji} *NagarDrishti — ROAD ALERT*\n\n"
         f"*Road:* {road}\n"
         f"*Score:* {score}/10 — *{level}*\n"
         f"*Action:* {action}\n"
@@ -664,7 +664,7 @@ def send_whatsapp_alert(record, to_number=None):
         f"*Time:* {ts}\n\n"
         f"📍 Maps: https://maps.google.com?q={lat},{lng}\n"
         f"🗺️ Dashboard: http://localhost:5000/city-map\n\n"
-        f"_RoadSense AI | Report: {record.get('id','')[:8].upper()}_"
+        f"_NagarDrishti | Report: {record.get('id','')[:8].upper()}_"
     )
 
     try:
@@ -1513,7 +1513,7 @@ def api_report(record_id):
     pdf_path = os.path.join(REPORT_DIR, f"report_{record_id}.pdf")
     _generate_pdf(record, pdf_path)
     return send_file(pdf_path, as_attachment=True,
-                     download_name=f"RoadSense_{record['road_name'].replace(' ','_')}.pdf")
+                     download_name=f"NagarDrishti_{record['road_name'].replace(' ','_')}.pdf")
 
 def _generate_pdf(record, pdf_path):
     doc    = SimpleDocTemplate(pdf_path, pagesize=A4,
@@ -1527,7 +1527,7 @@ def _generate_pdf(record, pdf_path):
                                   textColor=colors.HexColor("#666666"),  alignment=TA_CENTER, spaceAfter=20)
     head_style  = ParagraphStyle("head",  fontSize=13, fontName="Helvetica-Bold",
                                   textColor=colors.HexColor("#1a1a2e"), spaceBefore=16, spaceAfter=8)
-    story.append(Paragraph("🛣 RoadSense AI", title_style))
+    story.append(Paragraph("🛣 NagarDrishti", title_style))
     story.append(Paragraph("Road Inspection Report", sub_style))
     story.append(Spacer(1, 0.3*cm))
     ts   = record["timestamp"][:19].replace("T", " ")
@@ -1581,7 +1581,7 @@ def _generate_pdf(record, pdf_path):
     story.append(Spacer(1, 1*cm))
     footer_style = ParagraphStyle("foot", fontSize=8, textColor=colors.HexColor("#999999"), alignment=TA_CENTER)
     story.append(Paragraph(
-        f"Generated by RoadSense AI | {datetime.now().strftime('%d %b %Y %H:%M')} | "
+        f"Generated by NagarDrishti | {datetime.now().strftime('%d %b %Y %H:%M')} | "
         f"Report ID: {record['id'][:8].upper()}", footer_style))
     doc.build(story)
 
@@ -1599,7 +1599,7 @@ def api_video_report(video_id):
     _generate_video_pdf(vr, pdf_path)
     safe_name = vr["road_name"].replace(" ", "_")
     return send_file(pdf_path, as_attachment=True,
-                     download_name=f"RoadSense_Video_{safe_name}.pdf")
+                     download_name=f"NagarDrishti_Video_{safe_name}.pdf")
 
 
 def _generate_video_pdf(vr, pdf_path):
@@ -1634,7 +1634,7 @@ def _generate_video_pdf(vr, pdf_path):
     story = []
 
     # ─── COVER PAGE ───────────────────────────────────────────────────────────
-    story.append(Paragraph("🛣  RoadSense AI", title_s))
+    story.append(Paragraph("🛣  NagarDrishti", title_s))
     story.append(Paragraph("Video Inspection Report — Frame-by-Frame Analysis", sub_s))
     story.append(Spacer(1, 0.3*cm))
 
@@ -1701,7 +1701,7 @@ def _generate_video_pdf(vr, pdf_path):
     story.append(Spacer(1, 0.6*cm))
     story.append(Paragraph(
         f"Report ID: {vr['id'][:8].upper()}  |  "
-        f"Generated: {datetime.now().strftime('%d %b %Y %H:%M')}  |  RoadSense AI",
+        f"Generated: {datetime.now().strftime('%d %b %Y %H:%M')}  |  NagarDrishti",
         foot_s))
 
     # ─── FRAME PAGES ─────────────────────────────────────────────────────────
@@ -1822,7 +1822,7 @@ def api_chat():
         f"  - {r['road_name']}: {r['score']}/10 ({r['level']}) — {r['repair_action']} — ₹{r['economic_impact']:,} risk"
         for r in queue
     )
-    context = f"""You are RoadSense AI, an intelligent road governance assistant for Indian municipalities.
+    context = f"""You are NagarDrishti, an intelligent road governance assistant for Indian municipalities.
 
 LIVE DATABASE SUMMARY:
 - Total detections: {stats['total']}
@@ -2089,7 +2089,7 @@ def api_test_alerts():
 # ─── Run ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=" * 60)
-    print("  RoadSense AI — Starting Server")
+    print("  NagarDrishti — Starting Server")
     print(f"  Alert threshold : score >= {ALERT_CONFIG['alert_threshold']}")
     print(f"  Email alerts    : {'✓ Enabled' if ALERT_CONFIG['email_enabled'] else '✗ Disabled'}")
     print(f"  WhatsApp alerts : {'✓ Enabled' if ALERT_CONFIG['whatsapp_enabled'] else '✗ Disabled'}")
