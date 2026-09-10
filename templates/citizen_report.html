@@ -80,6 +80,16 @@
   </div>
   <input type="file" id="img-input" accept="image/*" style="display:none" onchange="fileSelected(this)"/>
 
+  <!-- Demo Button -->
+  <div style="text-align:center;margin:-6px 0 14px">
+    <button id="demo-btn" onclick="loadDemoImage()" type="button"
+            style="background:rgba(233,69,96,.12);border:1px solid rgba(233,69,96,.35);color:#e94560;
+                   border-radius:8px;padding:7px 20px;font-size:.78rem;font-weight:600;cursor:pointer;
+                   transition:.2s;letter-spacing:.3px">
+      <i class="fas fa-flask me-1"></i> Try Demo Image
+    </button>
+  </div>
+
   <div class="mb-3">
     <label class="form-label"><i class="fas fa-road me-1"></i>Road Name / Location</label>
     <input type="text" id="road-name" class="form-control" placeholder="e.g. MG Road near bus stand"/>
@@ -122,6 +132,33 @@
 
 <script>
 let selectedFile = null;
+
+function loadDemoImage() {
+  const btn = document.getElementById("demo-btn");
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Loading…';
+  btn.disabled = true;
+  fetch("/demo/image")
+    .then(r => r.blob())
+    .then(blob => {
+      const file = new File([blob], "demo_pothole.jpeg", { type: "image/jpeg" });
+      const dt   = new DataTransfer();
+      dt.items.add(file);
+      document.getElementById("img-input").files = dt.files;
+      fileSelected(document.getElementById("img-input"));
+      // Pre-fill road name for demo
+      if (!document.getElementById("road-name").value)
+        document.getElementById("road-name").value = "Demo — MG Road, Mumbai";
+      btn.innerHTML = '<i class="fas fa-check me-1"></i> Demo Loaded';
+      btn.style.background = "rgba(40,167,69,.15)";
+      btn.style.borderColor = "rgba(40,167,69,.4)";
+      btn.style.color = "#28a745";
+    })
+    .catch(() => {
+      btn.innerHTML = '<i class="fas fa-flask me-1"></i> Try Demo Image';
+      btn.disabled = false;
+      alert("Could not load demo image.");
+    });
+}
 
 // Auto GPS
 if(navigator.geolocation){

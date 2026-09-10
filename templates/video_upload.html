@@ -102,6 +102,16 @@
         </div>
         <input type="file" id="video-file" accept="video/*" style="display:none" onchange="fileSelected(this)"/>
 
+        <!-- Demo Button -->
+        <div class="text-center mt-2 mb-1">
+          <button id="demo-vid-btn" onclick="loadDemoVideo()" type="button"
+                  class="btn btn-sm"
+                  style="background:rgba(233,69,96,.08);border:1px solid rgba(233,69,96,.3);
+                         color:#e94560;font-weight:600;font-size:.78rem;padding:6px 18px;border-radius:8px">
+            <i class="fas fa-flask me-1"></i> Try Demo Dashcam Video
+          </button>
+        </div>
+
         <div class="row mt-3 g-2">
           <div class="col-12">
             <label class="form-label fw-bold" style="font-size:.78rem">Road Name</label>
@@ -259,6 +269,31 @@
 let selectedFile = null;
 let currentVideoId = null;
 let allFrames = [];
+
+/* ── Demo loader ─────────────────────────────────────────────── */
+function loadDemoVideo() {
+  const btn = document.getElementById("demo-vid-btn");
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Loading…';
+  btn.disabled = true;
+  fetch("/demo/video")
+    .then(r => r.blob())
+    .then(blob => {
+      const file = new File([blob], "demo_dashcam.mp4", { type: "video/mp4" });
+      const dt   = new DataTransfer();
+      dt.items.add(file);
+      document.getElementById("video-file").files = dt.files;
+      fileSelected({ files: [file] });
+      btn.innerHTML = '<i class="fas fa-check me-1"></i> Demo Loaded';
+      btn.style.background  = "rgba(40,167,69,.1)";
+      btn.style.borderColor = "rgba(40,167,69,.35)";
+      btn.style.color       = "#28a745";
+    })
+    .catch(() => {
+      btn.innerHTML = '<i class="fas fa-flask me-1"></i> Try Demo Dashcam Video';
+      btn.disabled  = false;
+      alert("Could not load demo video.");
+    });
+}
 
 /* ── File selection ─────────────────────────────────────────────── */
 function fileSelected(input) {

@@ -34,6 +34,7 @@ app.secret_key = "NagarDrishti_secret_2024"
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "static", "outputs")
 REPORT_DIR = os.path.join(BASE_DIR, "reports")
+UPLOAD_DIR = os.path.join(BASE_DIR, "upload")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(REPORT_DIR, exist_ok=True)
 
@@ -2084,6 +2085,26 @@ def api_test_alerts():
     officer_username = session.get("officer", "admin")
     send_all_alerts(fake_record, officer_username=officer_username)
     return jsonify({"ok": True, "message": "Test alerts sent — check your email and WhatsApp"})
+
+
+# ─── Demo File Routes ─────────────────────────────────────────────────────────
+@app.route("/demo/image")
+def demo_image():
+    """Serve the sample pothole image for the citizen report demo button."""
+    return send_file(
+        os.path.join(UPLOAD_DIR, "pothole.jpeg"),
+        mimetype="image/jpeg",
+        download_name="demo_pothole.jpeg"
+    )
+
+@app.route("/demo/video")
+def demo_video():
+    """Serve the sample dashcam video for the video upload demo button."""
+    return send_file(
+        os.path.join(UPLOAD_DIR, "dashcam.mp4"),
+        mimetype="video/mp4",
+        download_name="demo_dashcam.mp4"
+    )
 
 
 # ─── Run ──────────────────────────────────────────────────────────────────────
