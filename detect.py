@@ -2,15 +2,11 @@
 from ultralytics import YOLO
 import cv2
 import os
+from pathlib import Path
 
-# Load model ONCE when app starts (saves time)
-model = YOLO(
-    r"C:\Users\arnav\Desktop\Roadsena-AI\YOLOv8_Pothole_Segmentation_Road_Damage_Assessment\model\best.pt"
-)
-
-model = YOLO(
-    r"D:\Pathhole_Detection\RoadDamageDetection\models\YOLOv8_Small_RDD.pt"
-)
+# Resolve model path relative to this file — works no matter where the project is cloned
+_BASE = Path(__file__).parent
+model = YOLO(_BASE / "YOLOv8_Pothole_Segmentation_Road_Damage_Assessment" / "model" / "best.pt")
 
 # The 4 damage classes this model knows
 DAMAGE_CLASSES = {
@@ -54,7 +50,8 @@ def detect_damage(image_path):
 
     return detections, output_path
 
-det = []
 
-img_path = r"upload\ali3.jpg"
-det , path = detect_damage(image_path=img_path)
+if __name__ == "__main__":
+    img_path = r"images.jpg"
+    det, path = detect_damage(image_path=img_path)
+    print(det, path)

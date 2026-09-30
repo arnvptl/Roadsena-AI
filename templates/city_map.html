@@ -391,13 +391,14 @@ setTimeout(fixMapPosition, 200);
 setTimeout(fixMapPosition, 500);
 
 // ══════════════════════════════════════════════
-//  BASEMAPS (all free)
+//  BASEMAPS — 100% free, zero API key required
+//  Dark mode = OSM tiles + CSS invert filter
 // ══════════════════════════════════════════════
 const MAPS = [
-  { name:"Dark",     url:"https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png", sub:"" },
-  { name:"Street",   url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png", sub:"" },
-  { name:"HOT OSM",  url:"https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", sub:"abc" },
-  { name:"Topo",     url:"https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", sub:"abc" },
+  { name:"Dark",    url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",            sub:"",    dark:true  },
+  { name:"Carto",   url:"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", sub:"abcd", dark:false },
+  { name:"Street",  url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",            sub:"",    dark:false },
+  { name:"HOT OSM", url:"https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",     sub:"abc", dark:false },
 ];
 let mapIdx = 0;
 
@@ -405,27 +406,35 @@ const map = L.map("map", { zoomControl:false, attributionControl:true })
               .setView([17.6868, 75.9079], 13);
 window._leafletMap = map; // expose for fixMapPosition
 
-// OSM fallback — always works, no key needed
-const OSM_FALLBACK = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+// OSM is the universal fallback — always free, always works
+const OSM_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const OSM_ATTR = '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 let _tileErrorCount = 0;
+
+// Apply dark CSS filter to tile pane only (markers stay vivid)
+function setTileDarkFilter(enable) {
+  const pane = map.getPanes().tilePane;
+  if (pane) pane.style.filter = enable
+    ? "invert(100%) hue-rotate(180deg) brightness(0.85) contrast(1.1) saturate(0.5)"
+    : "none";
+}
 
 let tileLayer = L.tileLayer(MAPS[0].url, {
   subdomains: MAPS[0].sub || "",
   maxZoom: 22,
-  attribution: '© <a href="https://stadiamaps.com/">Stadia</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> © <a href="https://openstreetmap.org">OSM</a>'
+  attribution: OSM_ATTR
 }).addTo(map);
+setTileDarkFilter(MAPS[0].dark);
 
-// Auto-fallback to OSM if default tiles fail to load
+// Auto-fallback to OSM if any tile provider fails
 tileLayer.on("tileerror", function() {
   _tileErrorCount++;
-  if (_tileErrorCount === 3) { // switch after 3 failures
-    console.warn("Default tile provider failed — falling back to OpenStreetMap");
+  if (_tileErrorCount === 3) {
+    console.warn("Tile provider failed — falling back to OSM");
     map.removeLayer(tileLayer);
-    tileLayer = L.tileLayer(OSM_FALLBACK, {
-      maxZoom: 22,
-      attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
+    tileLayer = L.tileLayer(OSM_URL, { maxZoom:22, attribution:OSM_ATTR }).addTo(map);
     tileLayer.bringToBack();
+    setTileDarkFilter(true); // keep dark look
     _tileErrorCount = 0;
   }
 });
@@ -996,15 +1005,17 @@ function cycleMap(){
   const m=MAPS[mapIdx];
   map.removeLayer(tileLayer);
   _tileErrorCount=0;
-  tileLayer=L.tileLayer(m.url,{subdomains:m.sub||"",maxZoom:22}).addTo(map);
+  tileLayer=L.tileLayer(m.url,{subdomains:m.sub||"",maxZoom:22,attribution:OSM_ATTR}).addTo(map);
   tileLayer.bringToBack();
+  setTileDarkFilter(m.dark);
   tileLayer.on("tileerror",function(){
     _tileErrorCount++;
     if(_tileErrorCount===3){
       console.warn("Tile provider failed — falling back to OSM");
       map.removeLayer(tileLayer);
-      tileLayer=L.tileLayer(OSM_FALLBACK,{maxZoom:22}).addTo(map);
+      tileLayer=L.tileLayer(OSM_URL,{maxZoom:22,attribution:OSM_ATTR}).addTo(map);
       tileLayer.bringToBack();
+      setTileDarkFilter(true);
       _tileErrorCount=0;
     }
   });
