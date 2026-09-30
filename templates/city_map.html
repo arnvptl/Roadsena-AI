@@ -394,9 +394,9 @@ setTimeout(fixMapPosition, 500);
 //  BASEMAPS (all free)
 // ══════════════════════════════════════════════
 const MAPS = [
-  { name:"Dark",     url:"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", sub:"abcd" },
-  { name:"HOT OSM",  url:"https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", sub:"abc" },
+  { name:"Dark",     url:"https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png", sub:"" },
   { name:"Street",   url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png", sub:"" },
+  { name:"HOT OSM",  url:"https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", sub:"abc" },
   { name:"Topo",     url:"https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", sub:"abc" },
 ];
 let mapIdx = 0;
@@ -405,7 +405,31 @@ const map = L.map("map", { zoomControl:false, attributionControl:true })
               .setView([17.6868, 75.9079], 13);
 window._leafletMap = map; // expose for fixMapPosition
 
-let tileLayer = L.tileLayer(MAPS[0].url, { subdomains:MAPS[0].sub||"abc", maxZoom:22 }).addTo(map);
+// OSM fallback — always works, no key needed
+const OSM_FALLBACK = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+let _tileErrorCount = 0;
+
+let tileLayer = L.tileLayer(MAPS[0].url, {
+  subdomains: MAPS[0].sub || "",
+  maxZoom: 22,
+  attribution: '© <a href="https://stadiamaps.com/">Stadia</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> © <a href="https://openstreetmap.org">OSM</a>'
+}).addTo(map);
+
+// Auto-fallback to OSM if default tiles fail to load
+tileLayer.on("tileerror", function() {
+  _tileErrorCount++;
+  if (_tileErrorCount === 3) { // switch after 3 failures
+    console.warn("Default tile provider failed — falling back to OpenStreetMap");
+    map.removeLayer(tileLayer);
+    tileLayer = L.tileLayer(OSM_FALLBACK, {
+      maxZoom: 22,
+      attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+    tileLayer.bringToBack();
+    _tileErrorCount = 0;
+  }
+});
+
 L.control.zoom({ position:"bottomright" }).addTo(map);
 
 // ══════════════════════════════════════════════
@@ -971,8 +995,19 @@ function cycleMap(){
   mapIdx=(mapIdx+1)%MAPS.length;
   const m=MAPS[mapIdx];
   map.removeLayer(tileLayer);
-  tileLayer=L.tileLayer(m.url,{subdomains:m.sub||"abc",maxZoom:22}).addTo(map);
+  _tileErrorCount=0;
+  tileLayer=L.tileLayer(m.url,{subdomains:m.sub||"",maxZoom:22}).addTo(map);
   tileLayer.bringToBack();
+  tileLayer.on("tileerror",function(){
+    _tileErrorCount++;
+    if(_tileErrorCount===3){
+      console.warn("Tile provider failed — falling back to OSM");
+      map.removeLayer(tileLayer);
+      tileLayer=L.tileLayer(OSM_FALLBACK,{maxZoom:22}).addTo(map);
+      tileLayer.bringToBack();
+      _tileErrorCount=0;
+    }
+  });
   const fab=document.getElementById("fab-map");
   const orig=fab.innerHTML;
   fab.innerHTML=`<span style="font-size:.5rem;font-weight:800;font-family:'Rajdhani',sans-serif">${m.name}</span>`;
